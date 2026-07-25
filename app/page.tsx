@@ -485,9 +485,10 @@ function ArtifactPanel({ room, onVote, onExport }: { room: Room; onVote: (vote: 
   return <section className="artifact-panel">
     <Flex justify="between" align="center"><Box><Text size="1" color="gray" weight="bold">TEST CAPITAL</Text><Heading size="4">產物與核准</Heading></Box>{html && <Badge>v{html.version}</Badge>}</Flex>
     <Tabs.Root defaultValue="preview">
-      <Tabs.List><Tabs.Trigger value="preview">預覽</Tabs.Trigger><Tabs.Trigger value="tests">測試</Tabs.Trigger><Tabs.Trigger value="criteria">驗收</Tabs.Trigger></Tabs.List>
+      <Tabs.List><Tabs.Trigger value="preview">預覽</Tabs.Trigger><Tabs.Trigger value="code">生成程式碼</Tabs.Trigger><Tabs.Trigger value="tests">測試</Tabs.Trigger><Tabs.Trigger value="criteria">驗收</Tabs.Trigger></Tabs.List>
       <Box className="artifact-body">
-        <Tabs.Content value="preview">{html ? <iframe title="Generated artifact" sandbox="allow-scripts" srcDoc={html.content} /> : <Empty text="Agent 的單檔 HTML 會在這裡即時預覽。" />}</Tabs.Content>
+        <Tabs.Content value="preview">{html ? <iframe title="Generated artifact" sandbox="allow-scripts" srcDoc={html.content} /> : <Empty text="Agent 產出的完整 HTML 會在這個 sandboxed sub-window 預覽。" />}</Tabs.Content>
+        <Tabs.Content value="code">{html ? <pre className="generated-code">{html.content}</pre> : <Empty text="執行實作意圖後，可提取的完整 HTML 程式碼會出現在這裡。" />}</Tabs.Content>
         <Tabs.Content value="tests"><pre>{latest("tests")?.content || "尚無測試產物。"}</pre></Tabs.Content>
         <Tabs.Content value="criteria"><pre>{latest("criteria")?.content || "尚無驗收產物。"}</pre></Tabs.Content>
       </Box>
