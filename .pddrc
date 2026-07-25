@@ -6,7 +6,7 @@ contexts:
       generate_output_path: "pdd/"
       test_output_path: "tests/"
       example_output_path: "context/"
-      default_language: "python"
+      default_language: "typescript"
       strength: 0.818
       temperature: 0.0
       target_coverage: 80.0

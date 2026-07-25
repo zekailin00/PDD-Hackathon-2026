@@ -1,25 +1,7 @@
-# --- PDD local state (never commit: core dumps leak local paths/env,
-#     the litellm cache stores prompt and response bodies) ---
-.pdd/
-litellm_cache.sqlite/
-*.sqlite
-PDD-SETUP-SUMMARY.txt
-
-# --- secrets ---
+node_modules
+.next
 .env
-.env.*
-!.env.example
-
-# --- python ---
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-.pytest_cache/
-.coverage
-htmlcov/
-
-# --- os / editor ---
-.DS_Store
-.idea/
-.vscode/
+.env.local
+*.tsbuildinfo
+.venv
+.pytest_cache

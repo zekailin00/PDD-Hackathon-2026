@@ -1,239 +1,65 @@
-# CoPrompt
+# co-prompt
 
-**One AI session. The whole team. Nobody waits their turn.**
+Prompt-driven development is still usually one driver and several reviewers.
+co-prompt adds the missing multiplayer control layer: a shared intent document,
+role lanes, live execution, checkpoint steering, room approval, and export to a
+real PDD Issue.
 
-Built at the PDD Hackathon 2026 · Palo Alto · 25 July 2026
+Live production: [https://coprompt-ai.onrender.com](https://coprompt-ai.onrender.com)
 
----
+## Current demo
 
-## The problem
+- Join an existing public room from a dropdown, or use a private invite link.
+- Create a separate public/private co-working session with role, model,
+  optional room API key, and system prompt settings.
+- Use Member Chat without sending those messages to the AI or consuming tokens.
+- See online, away, and offline presence; logout removes the member.
+- Run one shared TokenRouter agent, steer it with NUDGE/HALT, review artifacts,
+  vote, and export an approved PDD Issue.
+- Seed data exists only in the public Demo room.
 
-Every AI coding tool today is single-player. One person drives; the rest of the
-team watches over a shoulder or waits for a Slack paste.
+## Run locally
 
-The PDD field guide says so in its own words:
+Requires Node 22 or newer.
 
-> *"Keep one person responsible for the issue and run controls while the rest
-> of the team reviews behavior, tests the product, and prepares the
-> demonstration."*
+```bash
+cp .env.example .env.local
+npm install
+npm run dev
+```
 
-PDD made prompts the durable source of truth. But prompt capital is still
-written by one person at a time.
+Set `TOKENROUTER_API_KEY` on the server. A creator can optionally submit a
+room-specific key over HTTPS; it is held only in server process memory and is
+never returned in room snapshots. TokenRouter has no auto alias, so the app
+reads its live catalog and chooses an eligible OpenAI-compatible text model
+deterministically. Opus is excluded by policy.
 
-**CoPrompt makes it multiplayer.**
+## Validation
 
-## Target user
+```bash
+npm run check
+```
 
-A working software team of 2–6 people — a PM, engineers, a designer, a QA —
-who already use an AI agent individually and want to direct one together:
-during a spec session, a bug triage, or a pairing block.
-
-Not for solo developers. The whole design assumes disagreement in the room.
-
----
-
-## What it does
-
-**Everyone prompts the same session.** One shared room, one agent, one token
-stream produced by the server and rebroadcast so every screen sees the same
-thing at the same moment.
-
-**Prompts never interrupt a run.** While the agent works, what you type queues
-as a *steer* and is consumed between steps. A teammate who sees it going wrong
-at second 20 doesn't wait three minutes to say so. A halt is checked mid-stream
-every 40 deltas, so stopping feels immediate.
-
-**Roles carry configurable power.** Each participant joins as PM / ENG / DESIGN /
-QA / OBSERVER, and the room decides what each role may do — start a run, steer
-one, halt it, edit the Intent, vote on a proposal, open the PR — plus a priority
-that breaks ties between conflicting steers. Defaults are permissive for the four
-working roles; `observer` exists so a guest can watch and suggest without a vote.
-A role without a vote is never counted as "waiting on", so an observer can never
-stall a proposal. Powers are enforced server-side, not by hiding buttons.
-
-**Roles carry weight with the agent.** Each participant joins in a role, and
-the agent is told who owns which decision. When two roles genuinely conflict it
-calls `ask_room` rather than silently picking a side. This maps onto PDD's
-three capitals: PM owns prompt capital, QA owns test capital, ENG owns
-grounding capital.
-
-**Everyone brings their own key, and the bill is split.** Keys live in server
-memory for the session only. After each run, usage is charged back to the
-participants who actually steered it.
-
-**The agent cannot write to your repository.** It reads, searches, and
-*proposes*. A proposal becomes a pull request only when the room approves —
-and the gate is re-evaluated server-side before a single GitHub call is made.
-
----
+The PDD source prompts live in `prompts/`; generated decision modules live in
+`pdd/`; behavioral tests live in `tests/`.
 
 ## Architecture
 
-```
-browser (static, no build step)
-   │  one SSE channel per room
-   ▼
-FastAPI  ── app/hub.py         fan-out: server streams once, everyone sees it
-         ── app/state.py       IDLE → RUNNING → PROPOSED → (approved) → PR
-         ── app/agent.py       agent loop, steering queue, read-only tools
-         ── app/keys.py        BYO keys, process memory only
-         ── app/repo_reader.py read + search, sandboxed to the repo root
-         ── app/providers.py   Anthropic · TokenRouter
-         ── app/memory.py      mem0, degrades to in-process
-         ── app/github_pr.py   the ONLY write path in the project
-   │
-   ▼
-pdd/     PDD-generated modules — the decision logic
-         token_split.py      how a shared run is billed
-         approval_quorum.py  whether a proposal may become a PR
-         role_policy.py      which role holds which power
-         path_sandbox.py     what the agent may read
-```
+Browser clients subscribe to a room SSE stream on the Node server. One client
+starts the shared agent; every token and step is broadcast to every subscriber.
+NUDGE and HALT commands enter a queue and are consumed between the three bounded
+agent phases. The server keeps provider and GitHub credentials private.
 
-The three decisions that carry real consequences — *who pays*, *who decides*,
-and *what ships* — are the modules owned by PDD prompts, not hand-written.
+The current room store is process-local for a reliable single-instance demo.
+Keep Render at exactly one instance until Supabase persistence, Realtime, and
+Presence are connected. A restart clears non-Demo rooms and room-specific keys.
+`supabase/migrations/` contains the RLS-safe durable schema; connecting it is
+tracked in `docs/IMPLEMENTATION_GAP_AUDIT.md`.
 
-### Session states
+## AI use disclosure
 
-| State | What it means |
-|---|---|
-| `IDLE` | Anyone edits the Intent doc. Anyone hits Run. |
-| `RUNNING` | Prompts don't interrupt; they queue as steers. |
-| `AWAITING_INPUT` | The agent asked the room; the next message answers. |
-| `PROPOSED` | A patch is waiting on approval. |
-
----
-
-## Setup
-
-```bash
-python -m venv .venv && source .venv/bin/activate
-```
-
-```bash
-pip install -r requirements.txt -r requirements-dev.txt
-```
-
-Generate the PDD-owned modules from their prompts — **required, the app
-degrades without them**:
-
-```bash
-./scripts/pdd-sync.sh
-```
-
-Run it:
-
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Open <http://localhost:8000>, pick a room name and a role. To share the room
-with teammates on the same LAN, use your computer's LAN address instead (for
-example, `http://10.10.10.82:8000/r/<room>`). Everyone lands in the same
-session.
-
-### Environment
-
-| Variable | Required | What for |
-|---|---|---|
-| `GITHUB_TOKEN` | for PRs | Opening the approved pull request |
-| `GITHUB_REPO` | for PRs | `owner/name` the PR is opened against |
-| `GITHUB_BASE_BRANCH` | no | Defaults to `main` |
-| `MEM0_API_KEY` | no | Cross-run room memory; falls back in-process |
-| `REPO_ROOT` | no | Codebase the agent may read; defaults to this repo |
-| `FALLBACK_API_KEY` | no | House key, so a visitor can try a room without bringing one |
-| `FALLBACK_PROVIDER` | no | Provider for the house key; defaults to `tokenrouter` |
-| `SEED_ROOMS` | no | `0` disables the worked example in new rooms |
-| `ALLOW_DEMO_SEED` | no | `1` enables the rehearsal proposal endpoint |
-
-Participants normally supply their own model API key in the UI. If
-`FALLBACK_API_KEY` is set, a room that nobody has brought a key to falls back to
-it, so the product is usable on arrival — a participant's own key always wins
-over the house key.
-
-**Never put a key in a file in this repository.** It is public; set keys in the
-deployment platform's environment settings.
-
-### Test
-
-```bash
-pytest tests/ -q
-```
-
-The approval-gate tests skip until `scripts/pdd-sync.sh` has generated
-`pdd/approval_quorum.py` — a missing artifact is "not generated yet", not a
-broken build. After generation: **90 passing**.
-
----
-
-## What we built today
-
-Everything in this repository except the PDD scaffolding (`.pddrc`,
-`success_python.prompt`) was written on 25 July 2026 during the event. The
-commit history shows the work in sequence, including the prompt-iteration cycle
-described in [`PDD_EVIDENCE.md`](PDD_EVIDENCE.md).
-
-## Known limitations
-
-Honest list, in the order we would fix them:
-
-- **Room state is in-process.** One server instance; a restart clears every
-  room. Fine for a demo, wrong for production — it wants Postgres or Redis.
-- **No authentication.** Anyone with the room URL can join and vote. The
-  approval gate is only as strong as who has the link.
-- **The Intent doc is last-write-wins** on a 400 ms debounce, not a CRDT.
-  Two people typing the same line will clobber each other.
-- **Proposals carry whole files, not patches.** Fine for small modules, wrong
-  for large files.
-- **`search` is a substring scan**, not an index. It will not scale past a
-  repository of this size.
-- **The PR path assumes a fresh branch.** It does not handle a force-push or a
-  conflicting concurrent edit.
-- **Band (agent-to-agent) is not wired up.** Design sketched below; we ran out
-  of clock.
-
----
-
-## Sponsor tools used
-
-| Sponsor | Where it lives | What it does for us |
-|---|---|---|
-| **[TokenRouter](https://www.tokenrouter.com/console/token)** | `app/providers.py` | Fronts leading models behind a Claude-compatible Messages API. This is what makes bring-your-own-key practical: one streaming implementation serves a direct Anthropic key *and* a TokenRouter key covering OpenAI/Gemini/others, so a room does not have to standardise on one vendor for everyone to take part. |
-| **[mem0](https://mem0.ai/)** | `app/memory.py` | Room memory across runs. The agent's `log_decision` tool writes decisions to mem0 under `room:<id>`; the next run recalls them, so the room does not re-litigate what it settled an hour ago. Degrades to in-process recall without a key. |
-| **[Render](https://render.com/)** | `render.yaml` | Deployment. Chosen for a real technical reason, not only for points: a run holds an SSE connection open for minutes, which a serverless platform would cut off. Render gives us a persistent process. |
-| **[Band](https://www.band.ai/)** | *planned* | Agent-to-agent. The natural next step: today a participant is a human with a role, but nothing in the room model requires that. Band would let a teammate delegate their seat to their own agent — it joins as a participant, holds a role, steers mid-run, and **votes on proposals** under the same quorum rules. Not built; see limitations. |
-
----
-
-## PDD workflow
-
-This project is built the PDD way, and the evidence is in
-[`PDD_EVIDENCE.md`](PDD_EVIDENCE.md):
-
-- **Prompts are the source.** `prompts/*.prompt` defines behaviour.
-- **`pdd/` holds artifacts.** Never hand-edited. When behaviour must change,
-  the prompt changes and the module is regenerated.
-- **One documented iteration** where test evidence forced a prompt change — a
-  rounding bug that lost a token per split was fixed in the *prompt*, not
-  patched in the code.
-
-## Disclosures
-
-- **AI tool usage.** This project was built using prompt-driven development —
-  that is the point of the event. The PDD CLI (local/Codex route) generates the
-  modules under `pdd/` from the prompts in `prompts/`. Claude Opus was used as
-  a pair-programming assistant for the application code in `app/` and
-  `static/`, which is hand-reviewed and not PDD-generated. Co-authored commits
-  carry a commit trailer.
-- **API keys.** No keys are committed. Participant keys are held in process
-  memory for the session only — never written to disk, never logged, never
-  included in any client payload. There is a test asserting this:
-  `test_api_key_never_appears_in_any_client_payload`.
-- **Attribution.** Dependencies are FastAPI, uvicorn, httpx and pytest — all
-  permissively licensed and unmodified. No third-party code was copied in.
-- **Pre-existing work.** None. The repository was empty apart from `pdd setup`
-  scaffolding when the event began.
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+This repository was migrated and implemented with AI assistance in Codex,
+including PDD prompt translation, TypeScript implementation, tests, and
+documentation. Product direction, positioning, naming decisions, scope, and
+final submission copy remain human-controlled. Git history and PDD prompts are
+the reproducible engineering evidence.
