@@ -87,6 +87,7 @@ pdd/     PDD-generated modules — the decision logic
          token_split.py      how a shared run is billed
          approval_quorum.py  whether a proposal may become a PR
          role_policy.py      which role holds which power
+         path_sandbox.py     what the agent may read
 ```
 
 The three decisions that carry real consequences — *who pays*, *who decides*,

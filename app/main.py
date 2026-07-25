@@ -459,7 +459,8 @@ async def room_memory(room_id: str):
 @app.get("/api/health")
 async def health():
     generated = {}
-    for mod in ("token_split", "approval_quorum", "role_policy"):
+    for mod in ("token_split", "approval_quorum", "role_policy",
+                "path_sandbox"):
         try:
             __import__(f"pdd.{mod}")
             generated[mod] = "generated"

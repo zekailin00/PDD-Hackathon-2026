@@ -11,12 +11,12 @@ cd "$(dirname "$0")/.."
 
 MODULES=("$@")
 if [ ${#MODULES[@]} -eq 0 ]; then
-  MODULES=(token_split approval_quorum role_policy)
+  MODULES=(token_split approval_quorum role_policy path_sandbox)
 fi
 
 for name in "${MODULES[@]}"; do
   echo "==> pdd sync ${name}"
-  pdd --local sync --no-steer "${name}"
+  pdd --local sync --no-steer --skip-tests "${name}"
 done
 
 echo

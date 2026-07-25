@@ -8,6 +8,8 @@ change goes through the room's approval gate first.
 import os
 from pathlib import Path
 
+from pdd.path_sandbox import SandboxViolation, resolve
+
 REPO_ROOT = Path(os.environ.get("REPO_ROOT", Path(__file__).resolve().parent.parent))
 
 _SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv",
@@ -23,12 +25,10 @@ class ReadOnlyViolation(Exception):
 
 
 def _resolve(rel_path: str) -> Path:
-    candidate = (REPO_ROOT / rel_path).resolve()
     try:
-        candidate.relative_to(REPO_ROOT.resolve())
-    except ValueError as exc:
-        raise ReadOnlyViolation(f"path escapes repository root: {rel_path}") from exc
-    return candidate
+        return resolve(REPO_ROOT, rel_path)
+    except SandboxViolation as exc:
+        raise ReadOnlyViolation(f"path is outside the readable repository: {rel_path}") from exc
 
 
 def list_files(subdir: str = "", limit: int = 400) -> list[str]:
