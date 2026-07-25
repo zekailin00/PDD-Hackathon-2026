@@ -51,6 +51,46 @@ function participant(input: { userId: string; name: string; role: Role }): Parti
 function seedDemoRoom(): void {
   if (store.rooms.has("demo")) return;
   const timestamp = now();
+  const kickoffMessageId = randomUUID();
+  const runId = randomUUID();
+  const demoOutput = [
+    "Demo proposal ready for room review.",
+    "",
+    "1. Added a focused launch checklist.",
+    "2. Included browser-ready HTML, acceptance criteria, and QA tests.",
+    "3. Waiting for the room to approve or request changes.",
+  ].join("\n");
+  const demoHtml = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CoPrompt Launch Checklist</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0b1020; color: #eef2ff; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    main { width: min(560px, calc(100% - 32px)); padding: 32px; border: 1px solid #334155; border-radius: 24px; background: #111827; box-shadow: 0 24px 80px #02061780; }
+    .eyebrow { color: #a5b4fc; font-size: 12px; font-weight: 800; letter-spacing: .16em; }
+    h1 { margin: 10px 0 8px; font-size: clamp(28px, 7vw, 44px); }
+    p { color: #aab4c8; line-height: 1.6; }
+    ul { display: grid; gap: 12px; padding: 0; list-style: none; }
+    li { padding: 14px 16px; border-radius: 14px; background: #1e293b; }
+    li::before { content: "✓"; margin-right: 10px; color: #34d399; font-weight: 900; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">COPROMPT DEMO</div>
+    <h1>Launch checklist</h1>
+    <p>A room-approved artifact generated from one shared team intent.</p>
+    <ul>
+      <li>Product goal is clear</li>
+      <li>Preview works in the browser</li>
+      <li>Acceptance criteria match the tests</li>
+    </ul>
+  </main>
+</body>
+</html>`;
   store.rooms.set("demo", {
     id: "demo",
     title: "Demo",
@@ -59,21 +99,106 @@ function seedDemoRoom(): void {
     systemPrompt: ROOM_AGENT_SYSTEM,
     preferredModel: "",
     isDemo: true,
-    state: "IDLE",
-    intent: "## Goal\n建立一個清楚、可共同審核的產品變更。\n\n## Acceptance criteria\n1. 產物可預覽\n2. 測試與驗收條件一致\n\n## Must not\n- 不得洩漏任何 API key\n",
+    state: "PROPOSED",
+    intent: "## Goal\n建立一個清楚、可共同審核的 launch checklist。\n\n## Acceptance criteria\n1. 產物可直接在瀏覽器預覽\n2. 頁面包含三項 launch checklist\n3. 測試與驗收條件一致\n\n## Must not\n- 不得呼叫外部 API\n- 不得洩漏任何 API key\n",
     participants: [],
-    messages: [{
-      id: randomUUID(),
-      authorName: "CoPrompt",
-      userId: "agent",
-      role: "agent",
-      kind: "system",
-      content: "這是唯一含有示範資料的 Demo 房間。加入後可直接體驗共同意圖、Member Chat、Steering Queue 與核准流程。",
+    messages: [
+      {
+        id: randomUUID(),
+        authorName: "CoPrompt",
+        userId: "agent",
+        role: "agent",
+        kind: "system",
+        content: "這是唯一含有示範資料的 Demo 房間。你可以直接查看共同意圖、Member Chat、agent proposal、artifact 預覽與核准流程。",
+        createdAt: timestamp,
+      },
+      {
+        id: kickoffMessageId,
+        authorName: "Mia",
+        userId: "demo-pm",
+        role: "pm",
+        kind: "member",
+        content: "我已把 launch checklist 的目標與驗收條件放進共同意圖，請大家確認範圍。",
+        createdAt: timestamp,
+      },
+      {
+        id: randomUUID(),
+        authorName: "Leo",
+        userId: "demo-eng",
+        role: "eng",
+        kind: "member",
+        content: "範圍清楚；HTML 保持單檔、無外部 API，這樣 iframe 可以直接預覽。",
+        replyTo: kickoffMessageId,
+        createdAt: timestamp,
+      },
+      {
+        id: randomUUID(),
+        authorName: "Mia",
+        userId: "demo-pm",
+        role: "pm",
+        kind: "prompt",
+        content: "依共同意圖建立 launch checklist 預覽，並附上驗收條件與測試。",
+        runId,
+        seenByAgent: true,
+        createdAt: timestamp,
+      },
+      {
+        id: randomUUID(),
+        authorName: "CoPrompt agent",
+        userId: "agent",
+        role: "agent",
+        kind: "agent",
+        content: demoOutput,
+        runId,
+        createdAt: timestamp,
+      },
+    ],
+    runs: [{
+      id: runId,
+      status: "proposed",
+      startedBy: "demo-pm",
+      model: "Demo model",
+      difficulty: "standard",
+      output: demoOutput,
+      tokenAllocation: { "demo-pm": 96, "demo-eng": 72 },
+      step: 3,
       createdAt: timestamp,
     }],
-    runs: [],
     steers: [],
-    artifacts: [],
+    artifacts: [
+      {
+        id: randomUUID(),
+        version: 1,
+        kind: "html",
+        content: demoHtml,
+        runId,
+        createdAt: timestamp,
+      },
+      {
+        id: randomUUID(),
+        version: 1,
+        kind: "tests",
+        content: [
+          "1. Open the Preview tab and confirm the page renders without network requests.",
+          "2. Confirm exactly three checklist items are visible.",
+          "3. Resize to 320px wide and confirm no horizontal scrolling.",
+        ].join("\n"),
+        runId,
+        createdAt: timestamp,
+      },
+      {
+        id: randomUUID(),
+        version: 1,
+        kind: "criteria",
+        content: [
+          "- Browser-ready single-file HTML is present.",
+          "- Three launch checklist items are readable.",
+          "- The preview is responsive and uses no external API.",
+        ].join("\n"),
+        runId,
+        createdAt: timestamp,
+      },
+    ],
     votes: [],
     createdAt: timestamp,
     updatedAt: timestamp,

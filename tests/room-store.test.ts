@@ -87,8 +87,14 @@ describe("production room boundaries", () => {
     });
     expect(demo?.isDemo).toBe(true);
     expect(demo?.messages.some((message) => message.content.includes("唯一含有示範資料"))).toBe(true);
+    expect(demo?.messages.some((message) => message.kind === "member")).toBe(true);
+    expect(demo?.runs.some((run) => run.status === "proposed" && run.output)).toBe(true);
+    expect(demo?.artifacts.map((artifact) => artifact.kind).sort()).toEqual(["criteria", "html", "tests"]);
+    expect(demo?.state).toBe("PROPOSED");
     expect(created.room.isDemo).toBeUndefined();
     expect(created.room.messages.some((message) => message.content.includes("示範資料"))).toBe(false);
+    expect(created.room.runs).toHaveLength(0);
+    expect(created.room.artifacts).toHaveLength(0);
   });
 
   it("keeps imported ZIP content server-side while exposing safe metadata", () => {
