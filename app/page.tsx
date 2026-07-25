@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import {
   Avatar,
   Badge,
@@ -44,7 +45,7 @@ const COPY = {
     switchToLight: "Switch to light mode",
     dark: "Dark",
     light: "Light",
-    heroTitle: "Prompt capital, written together.",
+    heroTitle: "CoPrompt",
     heroDescription: "Join Room and Create Co-working Session are separate. Rooms can only be selected from the public list or an invite link.",
     yourName: "Your name",
     pmRole: "PM · Scope",
@@ -140,7 +141,7 @@ const COPY = {
     switchToLight: "切換為淺色模式",
     dark: "深色",
     light: "淺色",
-    heroTitle: "Prompt capital，多人一起寫。",
+    heroTitle: "CoPrompt",
     heroDescription: "Join Room 與 Create Co-working Session 完全分開。房間只能從公開清單或邀請連結選擇。",
     yourName: "你的名字",
     pmRole: "PM · 範圍",
@@ -549,8 +550,8 @@ export default function Home() {
     /> : <main className="app-shell">
       <header className="topbar">
         <Flex align="center" gap="3">
-          <Box className="brand-mark">⌘</Box>
-          <Heading size="3">co-prompt</Heading>
+          <Image className="brand-icon" src="/coprompt-appicon.png" alt="" width={38} height={38} aria-hidden="true" />
+          <Heading size="3">CoPrompt</Heading>
           <Badge color={room.isDemo ? "violet" : "indigo"}>{room.isDemo ? "Demo" : room.visibility}</Badge>
           {room.sourceArchive && <Badge color="cyan" title={room.sourceArchive.name}>ZIP · {room.sourceArchive.fileCount} {copy.files}</Badge>}
         </Flex>
@@ -573,7 +574,7 @@ export default function Home() {
       <section className="ensemble-grid">
         <section className="intent-panel">
           <Flex justify="between" align="center">
-            <Box><Text size="1" color="gray" weight="bold">PROMPT CAPITAL</Text><Heading size="4">{copy.sharedIntent}</Heading></Box>
+            <Box><Text size="1" color="gray" weight="bold">COPROMPT</Text><Heading size="4">{copy.sharedIntent}</Heading></Box>
             <Button size="1" variant="soft" onClick={saveIntent} disabled={room.state === "RUNNING"}>{copy.sync}</Button>
           </Flex>
           <TextArea className="intent-editor" value={intentDraft} onChange={(event) => {
@@ -804,8 +805,17 @@ function Welcome(props: {
       />
     </Box>
     <Card className="welcome-card welcome-card-wide">
-      <Box className="welcome-logo">⌘</Box>
-      <Heading size="7">{props.copy.heroTitle}</Heading>
+      <Box className="welcome-lockup-frame">
+        <Image
+          className="welcome-lockup"
+          src="/coprompt-lockup.png"
+          alt="CoPrompt — build software together with AI"
+          width={1120}
+          height={300}
+          priority
+        />
+      </Box>
+      <Heading className="visually-hidden" size="7">{props.copy.heroTitle}</Heading>
       <Text as="p" color="gray" mt="2" mb="4">{props.copy.heroDescription}</Text>
       <Flex direction="column" gap="3" mb="4">
         <TextField.Root placeholder={props.copy.yourName} value={props.name} onChange={(event) => props.setName(event.target.value)} />

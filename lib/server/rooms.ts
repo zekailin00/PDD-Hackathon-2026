@@ -64,7 +64,7 @@ function seedDemoRoom(): void {
     participants: [],
     messages: [{
       id: randomUUID(),
-      authorName: "co-prompt",
+      authorName: "CoPrompt",
       userId: "agent",
       role: "agent",
       kind: "system",
@@ -134,7 +134,7 @@ export function createRoom(input: {
     participants: [participant(input.participant)],
     messages: [{
       id: randomUUID(),
-      authorName: "co-prompt",
+      authorName: "CoPrompt",
       userId: "agent",
       role: "agent",
       kind: "system",

@@ -184,7 +184,7 @@ export async function executeRoomAgent(input: {
       tokenAllocation: splitTokens(Math.max(1, Math.ceil(complete.length / 4)), weights),
     });
     addMessage(input.roomId, {
-      authorName: "co-prompt agent", userId: "agent", role: "agent",
+      authorName: "CoPrompt agent", userId: "agent", role: "agent",
       kind: "agent", content: complete, runId: run.id,
     });
     finishRun(input.roomId, run.id, "proposed");
