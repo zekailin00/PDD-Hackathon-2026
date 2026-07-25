@@ -26,8 +26,35 @@ def _participant(room: state.Room, user_id: str) -> state.Participant:
     return p
 
 
+def _role_policy():
+    try:
+        from pdd import role_policy
+    except ImportError as exc:
+        raise HTTPException(503, {
+            "error": "pdd/role_policy.py has not been generated yet.",
+            "fix": "Run scripts/pdd-sync.sh to generate it from its prompt.",
+        }) from exc
+    return role_policy
+
+
+def _require(room: state.Room, p: state.Participant, power: str) -> None:
+    """Refuse an action the participant's role does not hold.
+
+    Enforced here rather than by hiding a button, so a role without a power
+    cannot exercise it by calling the API directly.
+    """
+    rp = _role_policy()
+    if not rp.can(p.role, power, room.role_overrides):
+        raise HTTPException(403, f"{p.role.upper()} cannot {power} in this room")
+
+
 def _quorum(room: state.Room, proposal: state.Proposal) -> dict:
-    """Evaluate the approval gate via the PDD-generated module."""
+    """Evaluate the approval gate via the PDD-generated modules.
+
+    role_policy decides WHO holds a vote; approval_quorum decides whether the
+    votes cast are enough. Roles without the vote power are never counted as
+    "waiting on", so an observer in the room cannot stall a proposal forever.
+    """
     try:
         from pdd.approval_quorum import evaluate
     except ImportError as exc:
@@ -35,7 +62,13 @@ def _quorum(room: state.Room, proposal: state.Proposal) -> dict:
             "error": "pdd/approval_quorum.py has not been generated yet.",
             "fix": "Run scripts/pdd-sync.sh to generate it from its prompt.",
         }) from exc
-    return evaluate(list(room.participants), proposal.votes, room.policy)
+
+    rp = _role_policy()
+    electorate = rp.voters(
+        [{"user_id": u, "role": pt.role} for u, pt in room.participants.items()],
+        room.role_overrides,
+    )
+    return evaluate(electorate, proposal.votes, room.policy)
 
 
 # --------------------------------------------------------------------------
@@ -152,6 +185,7 @@ async def set_intent(room_id: str, body: dict = Body(...)):
         holder = room.participants.get(room.intent_locked_by)
         raise HTTPException(409, f"Intent is being edited by "
                                  f"{holder.name if holder else 'someone else'}")
+    _require(room, _participant(room, uid), "edit_intent")
     room.intent = body.get("intent", "")
     hub.publish(room_id, "intent", {"intent": room.intent, "by": uid})
     return {"ok": True}
@@ -192,6 +226,7 @@ async def post_message(room_id: str, body: dict = Body(...)):
         raise HTTPException(400, "content is required")
 
     if room.state == state.RUNNING and room.active_run_id:
+        _require(room, p, "steer")
         s = state.Steer(id=state._uid(), run_id=room.active_run_id, author_id=uid,
                         author_name=p.name, role=p.role,
                         kind=body.get("kind", "nudge"), content=content)
@@ -216,6 +251,8 @@ async def start_run(room_id: str, body: dict = Body(...)):
     room = _room(room_id)
     uid = body.get("user_id", "")
     p = _participant(room, uid)
+
+    _require(room, p, "run")
 
     # Whoever gets here first wins; everyone else is told who started it.
     if room.state != state.IDLE:
@@ -244,6 +281,7 @@ async def halt(room_id: str, body: dict = Body(...)):
     room = _room(room_id)
     uid = body.get("user_id", "")
     p = _participant(room, uid)
+    _require(room, p, "halt")
     if not room.active_run_id or room.state != state.RUNNING:
         raise HTTPException(409, "Nothing is running")
     room.steers.append(state.Steer(
@@ -268,6 +306,7 @@ async def vote(room_id: str, proposal_id: str, body: dict = Body(...)):
     if proposal.status != "pending":
         raise HTTPException(409, f"Proposal is already {proposal.status}")
 
+    _require(room, p, "vote")
     verdict = body.get("verdict")
     if verdict not in ("approve", "request_changes"):
         raise HTTPException(400, "verdict must be approve or request_changes")
@@ -300,7 +339,7 @@ async def open_pr(room_id: str, proposal_id: str, body: dict = Body(...)):
     """The only write path in the project, and the gate is checked here --
     not in the browser."""
     room = _room(room_id)
-    _participant(room, body.get("user_id", ""))
+    _require(room, _participant(room, body.get("user_id", "")), "open_pr")
     proposal = room.proposals.get(proposal_id)
     if proposal is None:
         raise HTTPException(404, "No such proposal")
@@ -346,6 +385,60 @@ async def create_demo_proposal(room_id: str):
     hub.publish(room_id, "proposal", state._proposal_view(proposal))
     hub.publish(room_id, "state", {"state": room.state})
     return {"proposal_id": proposal.id}
+
+
+@app.get("/api/rooms/{room_id}/roles")
+async def get_roles(room_id: str):
+    """The effective powers of every role in this room."""
+    room = _room(room_id)
+    rp = _role_policy()
+    return {
+        "powers": list(rp.POWERS),
+        "overrides": room.role_overrides,
+        "effective": {r: rp.resolve(r, room.role_overrides) for r in state.ROLES},
+        "lenses": state.ROLE_LENS,
+    }
+
+
+@app.put("/api/rooms/{room_id}/roles")
+async def set_roles(room_id: str, body: dict = Body(...)):
+    """Change what a role may do.
+
+    Any participant who can edit the Intent can also shape the room's rules --
+    this is a team tool, not an admin console. The change is broadcast so
+    everyone sees the rules shift under them rather than discovering it when a
+    button stops working.
+    """
+    room = _room(room_id)
+    uid = body.get("user_id", "")
+    p = _participant(room, uid)
+    _require(room, p, "edit_intent")
+
+    rp = _role_policy()
+    incoming = body.get("overrides") or {}
+    if not isinstance(incoming, dict):
+        raise HTTPException(400, "overrides must be an object")
+
+    clean: dict = {}
+    for role, patch in incoming.items():
+        if role not in state.ROLES or not isinstance(patch, dict):
+            continue
+        entry = {k: bool(v) for k, v in patch.items() if k in rp.POWERS}
+        if "priority" in patch:
+            try:
+                entry["priority"] = int(patch["priority"])
+            except (TypeError, ValueError):
+                raise HTTPException(400, "priority must be an integer") from None
+        if entry:
+            clean[role] = entry
+
+    room.role_overrides = clean
+    effective = {r: rp.resolve(r, clean) for r in state.ROLES}
+    hub.publish(room_id, "roles", {"overrides": clean, "effective": effective,
+                                   "by": p.name})
+    room.add_message("system", p.name, p.role,
+                     f"{p.name} changed the room's role powers")
+    return {"overrides": clean, "effective": effective}
 
 
 @app.get("/api/providers")

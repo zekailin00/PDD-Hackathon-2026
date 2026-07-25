@@ -15,7 +15,7 @@ cd "$(dirname "$0")/.."
 # (see PDD-SETUP-SUMMARY.txt), so direct prompt commands need --local.
 export PDD_MODEL_DEFAULT="${PDD_MODEL_DEFAULT:-chatgpt/gpt-5.6-sol}"
 
-MODULES=("${@:-token_split approval_quorum}")
+MODULES=("${@:-token_split approval_quorum role_policy}")
 
 for name in ${MODULES[@]}; do
   echo "==> pdd sync ${name}"

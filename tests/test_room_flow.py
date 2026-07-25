@@ -15,19 +15,23 @@ client = TestClient(app)
 
 ROOM = "test-room"
 
-# The approval-gate tests exercise pdd/approval_quorum.py. Before anyone has
-# run scripts/pdd-sync.sh that artifact does not exist yet, so they skip
-# rather than fail -- a missing artifact is a "not generated yet" state, not a
-# broken build.
+# Most of the room's behaviour routes through the PDD-owned modules: role_policy
+# decides who may act, approval_quorum decides whether a proposal ships. Before
+# anyone has run scripts/pdd-sync.sh those artifacts do not exist, so these
+# tests skip rather than fail -- a missing artifact is a "not generated yet"
+# state, not a broken build.
 try:
     import pdd.approval_quorum  # noqa: F401
-    _HAS_QUORUM = True
+    import pdd.role_policy      # noqa: F401
+    _HAS_PDD = True
 except ImportError:
-    _HAS_QUORUM = False
+    _HAS_PDD = False
+
+_HAS_QUORUM = _HAS_PDD          # kept for the existing markers below
 
 needs_quorum = pytest.mark.skipif(
-    not _HAS_QUORUM,
-    reason="pdd/approval_quorum.py not generated yet -- run scripts/pdd-sync.sh",
+    not _HAS_PDD,
+    reason="pdd modules not generated yet -- run scripts/pdd-sync.sh",
 )
 
 
@@ -87,6 +91,7 @@ def test_message_is_a_prompt_when_idle():
     assert r.json()["queued_as"] == "prompt"
 
 
+@needs_quorum
 def test_message_becomes_a_steer_while_running():
     uid = join("Amy", "eng")
     room = state.ROOMS[ROOM]
@@ -110,6 +115,7 @@ def test_message_becomes_an_answer_while_awaiting_input():
     assert r.json()["queued_as"] == "answer"
 
 
+@needs_quorum
 def test_running_room_rejects_a_second_run():
     uid = join("Amy", "eng")
     room = state.ROOMS[ROOM]
@@ -121,6 +127,7 @@ def test_running_room_rejects_a_second_run():
     assert r.status_code == 409, "two people hitting Run must not start two runs"
 
 
+@needs_quorum
 def test_run_without_any_key_is_refused():
     uid = join("Amy", "eng")
     assert not keys.has_fallback(), "this test assumes no house key in the env"
@@ -226,6 +233,7 @@ def test_gate_is_enforced_server_side_not_in_the_browser():
     assert r.status_code == 409
 
 
+@needs_quorum
 def test_invalid_verdict_is_rejected():
     amy = join("Amy", "eng")
     room = state.ROOMS[ROOM]
@@ -272,6 +280,7 @@ def test_empty_key_is_rejected():
 # contribution weights feed the token split
 # --------------------------------------------------------------------------
 
+@needs_quorum
 def test_contributions_are_ordered_with_the_initiator_first():
     amy, joe = join("Amy", "eng"), join("Joe", "qa")
     room = state.ROOMS[ROOM]
@@ -285,3 +294,124 @@ def test_contributions_are_ordered_with_the_initiator_first():
     assert contributions[0]["user_id"] == amy, "initiator must be first"
     assert {c["user_id"] for c in contributions} == {amy, joe}
     assert dict((c["user_id"], c["weight"]) for c in contributions)[joe] == 2.0
+
+
+# --------------------------------------------------------------------------
+# role powers -- who is allowed to do what, enforced server-side
+# --------------------------------------------------------------------------
+
+needs_roles = pytest.mark.skipif(
+    not _HAS_QUORUM,
+    reason="pdd modules not generated yet -- run scripts/pdd-sync.sh",
+)
+
+
+@needs_roles
+def test_observer_cannot_start_a_run():
+    uid = join("Zed", "observer")
+    keys.put(ROOM, uid, "sk-ant-test")
+    r = client.post(f"/api/rooms/{ROOM}/run", json={"user_id": uid})
+    assert r.status_code == 403
+
+
+@needs_roles
+def test_observer_can_still_steer():
+    amy = join("Amy", "eng")
+    zed = join("Zed", "observer")
+    room = state.ROOMS[ROOM]
+    state.new_run(room, amy)
+    room.state = state.RUNNING
+
+    r = client.post(f"/api/rooms/{ROOM}/message",
+                    json={"user_id": zed, "content": "the table needs a header"})
+    assert r.status_code == 200, "an observer may suggest"
+    assert r.json()["queued_as"] == "nudge"
+
+
+@needs_roles
+def test_observer_cannot_vote():
+    amy = join("Amy", "eng")
+    zed = join("Zed", "observer")
+    room = state.ROOMS[ROOM]
+    p = propose(room)
+    r = client.post(f"/api/rooms/{ROOM}/proposals/{p.id}/vote",
+                    json={"user_id": zed, "verdict": "approve"})
+    assert r.status_code == 403
+
+
+@needs_roles
+def test_an_observer_never_blocks_a_proposal():
+    """The bug this guards: a non-voting role sitting in waiting_on forever."""
+    amy = join("Amy", "eng")
+    join("Zed", "observer")
+    room = state.ROOMS[ROOM]
+    p = propose(room)
+
+    q = client.post(f"/api/rooms/{ROOM}/proposals/{p.id}/vote",
+                    json={"user_id": amy, "verdict": "approve"}).json()
+    assert q["can_open_pr"] is True, "the observer must not be waited on"
+    assert q["waiting_on"] == []
+
+
+@needs_roles
+def test_design_cannot_halt_by_default():
+    amy = join("Amy", "eng")
+    dee = join("Dee", "design")
+    room = state.ROOMS[ROOM]
+    state.new_run(room, amy)
+    room.state = state.RUNNING
+    assert client.post(f"/api/rooms/{ROOM}/halt",
+                       json={"user_id": dee}).status_code == 403
+
+
+@needs_roles
+def test_a_room_can_grant_design_the_halt_power():
+    amy = join("Amy", "eng")
+    dee = join("Dee", "design")
+    client.put(f"/api/rooms/{ROOM}/roles",
+               json={"user_id": amy, "overrides": {"design": {"halt": True}}})
+
+    room = state.ROOMS[ROOM]
+    state.new_run(room, amy)
+    room.state = state.RUNNING
+    assert client.post(f"/api/rooms/{ROOM}/halt",
+                       json={"user_id": dee}).status_code == 200
+
+
+@needs_roles
+def test_revoking_a_vote_removes_that_role_from_the_electorate():
+    amy = join("Amy", "eng")
+    dee = join("Dee", "design")
+    client.put(f"/api/rooms/{ROOM}/roles",
+               json={"user_id": amy, "overrides": {"design": {"vote": False}}})
+
+    room = state.ROOMS[ROOM]
+    p = propose(room)
+    q = client.post(f"/api/rooms/{ROOM}/proposals/{p.id}/vote",
+                    json={"user_id": amy, "verdict": "approve"}).json()
+    assert q["can_open_pr"] is True
+    assert dee not in q["waiting_on"]
+
+
+@needs_roles
+def test_a_role_without_open_pr_cannot_call_the_endpoint():
+    amy = join("Amy", "eng")
+    dee = join("Dee", "design")
+    room = state.ROOMS[ROOM]
+    p = propose(room)
+    for uid in (amy, dee):
+        client.post(f"/api/rooms/{ROOM}/proposals/{p.id}/vote",
+                    json={"user_id": uid, "verdict": "approve"})
+    # Design is fully approved but holds no open_pr power by default.
+    r = client.post(f"/api/rooms/{ROOM}/proposals/{p.id}/pr", json={"user_id": dee})
+    assert r.status_code == 403
+
+
+@needs_roles
+def test_unknown_power_in_an_override_is_ignored():
+    amy = join("Amy", "eng")
+    r = client.put(f"/api/rooms/{ROOM}/roles",
+                   json={"user_id": amy,
+                         "overrides": {"design": {"teleport": True, "halt": True}}})
+    assert "teleport" not in r.json()["overrides"]["design"]
+    assert r.json()["effective"]["design"]["halt"] is True

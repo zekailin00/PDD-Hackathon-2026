@@ -43,7 +43,15 @@ as a *steer* and is consumed between steps. A teammate who sees it going wrong
 at second 20 doesn't wait three minutes to say so. A halt is checked mid-stream
 every 40 deltas, so stopping feels immediate.
 
-**Roles carry weight.** Each participant joins as PM / ENG / DESIGN / QA, and
+**Roles carry configurable power.** Each participant joins as PM / ENG / DESIGN /
+QA / OBSERVER, and the room decides what each role may do — start a run, steer
+one, halt it, edit the Intent, vote on a proposal, open the PR — plus a priority
+that breaks ties between conflicting steers. Defaults are permissive for the four
+working roles; `observer` exists so a guest can watch and suggest without a vote.
+A role without a vote is never counted as "waiting on", so an observer can never
+stall a proposal. Powers are enforced server-side, not by hiding buttons.
+
+**Roles carry weight with the agent.** Each participant joins in a role, and
 the agent is told who owns which decision. When two roles genuinely conflict it
 calls `ask_room` rather than silently picking a side. This maps onto PDD's
 three capitals: PM owns prompt capital, QA owns test capital, ENG owns
@@ -78,10 +86,11 @@ FastAPI  ── app/hub.py         fan-out: server streams once, everyone sees i
 pdd/     PDD-generated modules — the decision logic
          token_split.py      how a shared run is billed
          approval_quorum.py  whether a proposal may become a PR
+         role_policy.py      which role holds which power
 ```
 
-The two decisions that carry real consequences — *who pays* and *what ships* —
-are the two modules owned by PDD prompts, not hand-written.
+The three decisions that carry real consequences — *who pays*, *who decides*,
+and *what ships* — are the modules owned by PDD prompts, not hand-written.
 
 ### Session states
 
