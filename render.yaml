@@ -10,7 +10,7 @@
 
 services:
   - type: web
-    name: ensemble
+    name: coprompt
     runtime: python
     plan: starter
     numInstances: 1

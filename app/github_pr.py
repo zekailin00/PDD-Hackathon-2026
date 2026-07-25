@@ -44,7 +44,7 @@ async def open_pull_request(proposal, room, quorum: dict) -> str:
     """
     token, owner, name, base = _config()
     h = _headers(token)
-    branch = f"ensemble/{proposal.id}"
+    branch = f"coprompt/{proposal.id}"
 
     async with httpx.AsyncClient(timeout=60.0, headers=h) as c:
         ref = await c.get(f"{API}/repos/{owner}/{name}/git/ref/heads/{base}")
@@ -64,7 +64,7 @@ async def open_pull_request(proposal, room, quorum: dict) -> str:
                 params={"ref": branch},
             )
             payload = {
-                "message": f"{proposal.title}\n\nProposed in Ensemble room {room.id}.",
+                "message": f"{proposal.title}\n\nProposed in CoPrompt room {room.id}.",
                 "content": base64.b64encode(
                     f["new_content"].encode("utf-8")
                 ).decode("ascii"),
@@ -106,7 +106,7 @@ def _pr_body(proposal, room, quorum: dict) -> str:
 
 ## How this was produced
 
-Co-authored live in an Ensemble room by
+Co-authored live in an CoPrompt room by
 {names(list(members))}.
 
 The agent had **read-only** access to this repository. It could read, search,
@@ -128,5 +128,5 @@ Gate logic: `pdd/approval_quorum.py`, generated from
 {chr(10).join(f'- `{f["path"]}`' for f in proposal.files)}
 
 ---
-Opened from Ensemble room `{room.id}` · proposal `{proposal.id}`
+Opened from CoPrompt room `{room.id}` · proposal `{proposal.id}`
 """

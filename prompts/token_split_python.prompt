@@ -4,7 +4,7 @@
 
 ## Intent
 
-In Ensemble, several people share a single AI session. Each person brings their
+In CoPrompt, several people share a single AI session. Each person brings their
 own API key. When a run finishes we know the total tokens it consumed, and we
 know which participants contributed prompts or steers to that run. This module
 decides how many tokens each participant's key is charged.

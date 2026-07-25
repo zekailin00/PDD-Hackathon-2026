@@ -26,7 +26,7 @@ FLUSH_INTERVAL = 0.06        # seconds between token broadcasts
 HALT_CHECK_EVERY = 40        # deltas between mid-stream halt checks
 
 SYSTEM_PROMPT = """\
-You are Ensemble, the shared agent for a team room. Several people direct you
+You are CoPrompt, the shared agent for a team room. Several people direct you
 at the same time, each in a declared role.
 
 Rules of the room:
@@ -156,9 +156,9 @@ def build_messages(room: state.Room, run_id: str) -> list[dict]:
         lines.append("\n# Room conversation\n")
         for m in convo:
             if m.kind == "agent":
-                lines.append(f"[Ensemble]: {m.content}")
+                lines.append(f"[CoPrompt]: {m.content}")
             elif m.kind == "question":
-                lines.append(f"[Ensemble asked]: {m.content}")
+                lines.append(f"[CoPrompt asked]: {m.content}")
             else:
                 tag = "STEER" if m.kind == "steer" else m.kind.upper()
                 lines.append(f"[{tag} from {m.author_name} ({m.role.upper()})]: {m.content}")
@@ -188,7 +188,7 @@ async def _run_tool(room: state.Room, run_id: str, name: str, args: dict) -> tup
 
         if name == "log_decision":
             memory.record_decision(room.id, args["decision"],
-                                   args.get("rationale", ""), by="Ensemble")
+                                   args.get("rationale", ""), by="CoPrompt")
             hub.publish(room.id, "decision", {
                 "decision": args["decision"],
                 "rationale": args.get("rationale", ""),
@@ -212,7 +212,7 @@ async def _ask_room(room: state.Room, run_id: str, args: dict) -> str:
     question = args["question"]
     options = args.get("options") or []
     room.state = state.AWAITING_INPUT
-    msg = room.add_message("question", "Ensemble", "agent", question, run_id=run_id)
+    msg = room.add_message("question", "CoPrompt", "agent", question, run_id=run_id)
     hub.publish(room.id, "question", {
         "run_id": run_id, "question": question,
         "options": options, "message_id": msg.id,
@@ -362,7 +362,7 @@ async def run_agent(room: state.Room, run_id: str, model: str | None = None) -> 
 
         run.status = "done"
         if transcript.strip():
-            room.add_message("agent", "Ensemble", "agent", transcript.strip(),
+            room.add_message("agent", "CoPrompt", "agent", transcript.strip(),
                              run_id=run_id)
 
     except httpx.HTTPStatusError as exc:
