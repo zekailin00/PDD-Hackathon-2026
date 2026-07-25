@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ensemble — one AI session, the whole team</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<div id="gate" class="gate">
+  <div class="gate-card">
+    <h1>Ensemble</h1>
+    <p class="tag">One AI session. The whole team. Nobody waits their turn.</p>
+
+    <label>Room
+      <input id="g-room" placeholder="otter-42" autocomplete="off">
+    </label>
+    <label>Your name
+      <input id="g-name" placeholder="Amy" autocomplete="off">
+    </label>
+    <label>Your role
+      <select id="g-role">
+        <option value="pm">PM — owns scope &amp; acceptance criteria</option>
+        <option value="eng" selected>ENG — owns implementation</option>
+        <option value="design">DESIGN — owns UX</option>
+        <option value="qa">QA — owns verification</option>
+      </select>
+    </label>
+    <button id="g-join" class="primary">Join room</button>
+    <p class="hint">No account. No password. Your role decides what the agent
+      defers to you on.</p>
+  </div>
+</div>
+
+<div id="app" class="app hidden">
+  <header class="bar">
+    <div class="brand">Ensemble<span class="room-id" id="room-label"></span></div>
+    <div id="peers" class="peers"></div>
+    <div class="bar-right">
+      <span id="state-pill" class="pill idle">IDLE</span>
+      <button id="key-btn" class="ghost">Add my API key</button>
+    </div>
+  </header>
+
+  <main class="grid">
+    <section class="pane intent-pane">
+      <div class="pane-head">
+        <h2>Shared Intent</h2>
+        <span id="lock-note" class="lock-note"></span>
+      </div>
+      <textarea id="intent" placeholder="## Goal
+One sentence describing the user-visible outcome.
+
+## Acceptance criteria
+1. Given ..., when ..., then ...
+
+## Must not
+- Must not ..."></textarea>
+      <div class="intent-actions">
+        <button id="run-btn" class="primary">▶ Run</button>
+        <button id="halt-btn" class="danger hidden">■ Halt</button>
+      </div>
+      <div class="ledger">
+        <h3>Usage this room</h3>
+        <div id="ledger-body" class="ledger-body">
+          <span class="muted">No runs yet.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="pane run-pane">
+      <div class="pane-head"><h2>Live run</h2><span id="provider-note" class="muted"></span></div>
+      <div id="steps" class="steps"></div>
+      <pre id="stream" class="stream"></pre>
+      <div id="steer-flash" class="steer-flash hidden"></div>
+    </section>
+
+    <section class="pane chat-pane">
+      <div class="pane-head"><h2>Room</h2></div>
+      <div id="chat" class="chat"></div>
+      <div class="composer">
+        <input id="composer-input" placeholder="Type to prompt…" autocomplete="off">
+        <button id="send-btn" class="primary">Send</button>
+      </div>
+      <p id="composer-hint" class="hint">Room is idle — this starts the next run's prompt.</p>
+    </section>
+
+    <section class="pane proposal-pane">
+      <div class="pane-head"><h2>Proposal</h2><span id="quorum-note" class="muted"></span></div>
+      <div id="proposal" class="proposal">
+        <span class="muted">The agent is read-only. When it proposes a change,
+          it appears here and needs everyone's approval before it can become a PR.</span>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="key-modal" class="modal hidden">
+  <div class="modal-card">
+    <h2>Bring your own key</h2>
+    <p class="hint">Held in the server's memory for this session only. Never
+      written to disk, never logged, never sent anywhere except the provider
+      it belongs to. Usage is split back to you by contribution.</p>
+    <label>Provider
+      <select id="k-provider"></select>
+    </label>
+    <label>API key
+      <input id="k-key" type="password" placeholder="sk-ant-… / tr-…" autocomplete="off">
+    </label>
+    <div class="modal-actions">
+      <button id="k-save" class="primary">Load key</button>
+      <button id="k-cancel" class="ghost">Cancel</button>
+    </div>
+    <p id="k-status" class="hint"></p>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
