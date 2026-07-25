@@ -139,6 +139,67 @@ TOOLS = [
 ]
 
 
+PHASES = ("reading", "thinking", "proposing", "done")
+
+
+def _publish_progress(room: state.Room, run_id: str, *, phase: str, step: int,
+                      note: str = "") -> None:
+    """Where the run is, and whose words it has actually taken in.
+
+    A shared session has a fairness problem a solo one does not: when four
+    people type, each needs to know whether the agent has their message yet or
+    is still working from someone else's. Guessing from a token stream is not
+    good enough, so the room is told outright.
+    """
+    pending = [m for m in room.messages
+               if m.kind in ("prompt", "steer", "answer") and not m.seen_by_agent]
+    consumed = [m for m in room.messages
+                if m.kind in ("prompt", "steer", "answer") and m.seen_by_agent]
+
+    def who(ms):
+        seen, out = set(), []
+        for m in ms:
+            if m.author_id and m.author_id not in seen:
+                seen.add(m.author_id)
+                out.append({"user_id": m.author_id, "name": m.author_name,
+                            "role": m.role})
+        return out
+
+    room.progress = {
+        "run_id": run_id,
+        "phase": phase,
+        "step": step,
+        "total_steps": MAX_STEPS,
+        "percent": min(100, round(100 * step / MAX_STEPS)) if phase != "done" else 100,
+        "note": note,
+        "picked_up": who(consumed),
+        "waiting": who(pending),
+    }
+    hub.publish(room.id, "progress", room.progress)
+
+
+def _mark_seen(room: state.Room, upto_id: int | None = None) -> None:
+    for m in room.messages:
+        if m.kind in ("prompt", "steer", "answer") and not m.seen_by_agent:
+            if upto_id is None or m.id <= upto_id:
+                m.seen_by_agent = True
+
+
+def _difficulty(room: state.Room) -> str:
+    """How hard this run looks, from the room itself.
+
+    A short intent with no acceptance criteria is a quick question; a long one
+    with several criteria is real work. Nobody has to set a dial.
+    """
+    intent = (room.intent or "").strip()
+    criteria = intent.lower().count("given ") + intent.lower().count("must not")
+    if len(intent) < 200 and criteria == 0:
+        return "cheap"
+    if len(intent) > 900 or criteria >= 4:
+        return "hard"
+    return "standard"
+
+
 # --------------------------------------------------------------------------
 # context
 # --------------------------------------------------------------------------
@@ -164,15 +225,25 @@ def build_messages(room: state.Room, run_id: str) -> list[dict]:
     convo = [m for m in room.messages
              if m.kind in ("prompt", "steer", "agent", "question", "answer")][-40:]
     if convo:
+        by_id = {m.id: m for m in room.messages}
         lines.append("\n# Room conversation\n")
+        lines.append(
+            "Teammates reply to each other. When a message replies to another, "
+            "the reply is the room's current position on that point -- follow "
+            "the LAST word in a thread, not the first.\n")
         for m in convo:
             if m.kind == "agent":
-                lines.append(f"[CoPrompt]: {m.content}")
+                lines.append(f"[#{m.id} CoPrompt]: {m.content}")
             elif m.kind == "question":
-                lines.append(f"[CoPrompt asked]: {m.content}")
+                lines.append(f"[#{m.id} CoPrompt asked]: {m.content}")
             else:
                 tag = "STEER" if m.kind == "steer" else m.kind.upper()
-                lines.append(f"[{tag} from {m.author_name} ({m.role.upper()})]: {m.content}")
+                head = f"[#{m.id} {tag} from {m.author_name} ({m.role.upper()})"
+                parent = by_id.get(m.reply_to) if m.reply_to else None
+                if parent:
+                    head += (f", replying to #{parent.id} {parent.author_name}"
+                             f" -- this SUPERSEDES it")
+                lines.append(f"{head}]: {m.content}")
 
     return [{"role": "user", "content": "\n".join(lines)}]
 
@@ -288,19 +359,34 @@ async def run_agent(room: state.Room, run_id: str, model: str | None = None) -> 
 
     provider = entry.get("provider", providers.DEFAULT_PROVIDER)
     endpoint = providers.endpoint(provider)
-    model = model or providers.default_model(provider)
-    hub.publish(room.id, "provider", {
-        "run_id": run_id,
-        "provider": providers.resolve(provider)["label"],
-        "model": model,
-        "shared": entry.get("shared", False),
-    })
 
+    _mark_seen(room)
+    _publish_progress(room, run_id, phase="reading", step=0,
+                      note="reading the room")
     messages = build_messages(room, run_id)
     transcript = ""
 
     try:
         async with httpx.AsyncClient(timeout=180.0) as client:
+            # Nobody in the room picks a model. The routing policy does, from
+            # whatever this key can actually reach.
+            if model:
+                pick_reason = "chosen for this run"
+            else:
+                catalog = await providers.fetch_catalog(client, provider, entry["key"])
+                model, pick_reason = providers.auto_select(
+                    catalog, provider,
+                    difficulty=_difficulty(room),
+                    prefer=room.preferred_model,
+                )
+
+            hub.publish(room.id, "provider", {
+                "run_id": run_id,
+                "provider": providers.resolve(provider)["label"],
+                "model": model,
+                "reason": pick_reason,
+                "shared": entry.get("shared", False),
+            })
             for step in range(MAX_STEPS):
 
                 # -- drain the steering queue between steps -----------------
@@ -320,11 +406,17 @@ async def run_agent(room: state.Room, run_id: str, model: str | None = None) -> 
                         for s in pending
                     )
                     messages.append({"role": "user", "content": nudges})
+                    _mark_seen(room)
+                    _publish_progress(room, run_id, phase="thinking", step=step,
+                                      note="picked up new steering")
                     hub.publish(room.id, "steer_applied", {
                         "run_id": run_id,
                         "steers": [{"author": s.author_name, "role": s.role,
                                     "content": s.content} for s in pending],
                     })
+
+                _publish_progress(room, run_id, phase="thinking", step=step,
+                                  note=f"step {step + 1} of {MAX_STEPS}")
 
                 left = MAX_STEPS - step
                 if left <= 2:
@@ -363,6 +455,11 @@ async def run_agent(room: state.Room, run_id: str, model: str | None = None) -> 
 
                 results, stop = [], False
                 for call in tool_calls:
+                    phase = ("proposing" if call["name"] == "propose_patch"
+                             else "reading" if call["name"] in
+                             ("read_file", "list_files", "search") else "thinking")
+                    _publish_progress(room, run_id, phase=phase, step=step,
+                                      note=call["name"].replace("_", " "))
                     hub.publish(room.id, "tool", {"run_id": run_id,
                                                   "name": call["name"]})
                     out, should_stop = await _run_tool(
@@ -390,14 +487,22 @@ async def run_agent(room: state.Room, run_id: str, model: str | None = None) -> 
     except httpx.HTTPStatusError as exc:
         run.status = "error"
         hub.publish(room.id, "error", {
-            "message": f"Model provider returned {exc.response.status_code}. "
-                       "Check the API key that was loaded.",
+            "message": f"The model provider returned {exc.response.status_code}. "
+                       "Check the key that was loaded.",
         })
     except Exception as exc:                     # noqa: BLE001
         run.status = "error"
-        hub.publish(room.id, "error", {"message": f"{type(exc).__name__}: {exc}"})
+        # Exception text can quote the request, and the request carries the
+        # key. Broadcasting it would hand every browser in the room a
+        # participant's credential, so only the type escapes this process.
+        hub.publish(room.id, "error", {
+            "message": f"The run failed ({type(exc).__name__}). "
+                       "Details stay on the server.",
+        })
 
     finally:
+        _publish_progress(room, run_id, phase="done", step=MAX_STEPS,
+                          note=run.status)
         _settle_ledger(room, run_id)
         if room.state != state.PROPOSED:
             room.state = state.IDLE

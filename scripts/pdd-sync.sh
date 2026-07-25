@@ -16,7 +16,8 @@ fi
 
 for name in "${MODULES[@]}"; do
   echo "==> pdd sync ${name}"
-  pdd --local sync --no-steer --skip-tests "${name}"
+  pdd --local sync --no-steer --skip-tests \
+    --model gemini/gemini-3.5-flash "${name}"
 done
 
 echo

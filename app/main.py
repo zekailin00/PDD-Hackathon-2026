@@ -225,6 +225,11 @@ async def post_message(room_id: str, body: dict = Body(...)):
     if not content:
         raise HTTPException(400, "content is required")
 
+    reply_to = body.get("reply_to")
+    if reply_to is not None:
+        if not any(m.id == reply_to for m in room.messages):
+            raise HTTPException(400, "reply_to does not name a message in this room")
+
     if room.state == state.RUNNING and room.active_run_id:
         _require(room, p, "steer")
         s = state.Steer(id=state._uid(), run_id=room.active_run_id, author_id=uid,
@@ -232,7 +237,8 @@ async def post_message(room_id: str, body: dict = Body(...)):
                         kind=body.get("kind", "nudge"), content=content)
         room.steers.append(s)
         m = room.add_message("steer", p.name, p.role, content,
-                             author_id=uid, run_id=room.active_run_id)
+                             author_id=uid, run_id=room.active_run_id,
+                             reply_to=reply_to)
         hub.publish(room_id, "message", vars(m))
         hub.publish(room_id, "steer_queued", {
             "author": p.name, "role": p.role, "kind": s.kind, "content": content,
@@ -241,7 +247,8 @@ async def post_message(room_id: str, body: dict = Body(...)):
 
     kind = "answer" if room.state == state.AWAITING_INPUT else "prompt"
     m = room.add_message(kind, p.name, p.role, content,
-                         author_id=uid, run_id=room.active_run_id)
+                         author_id=uid, run_id=room.active_run_id,
+                         reply_to=reply_to)
     hub.publish(room_id, "message", vars(m))
     return {"queued_as": kind}
 

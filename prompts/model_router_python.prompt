@@ -1,0 +1,109 @@
+% model_router — pick the model for a run so nobody in the room has to
+
+# Module: model_router
+
+## Intent
+
+CoPrompt reaches many vendors through one TokenRouter key. TokenRouter has no
+server-side "auto" model, so the choice has to be made here — and it should not
+be made by the people in the room. A team directing an agent together should not
+have to stop and argue about model names.
+
+This module picks. Given the catalog the router advertises and a little context
+about the run, it returns one model id and a short reason the room can read.
+
+Pure decision logic over a catalog. No network, no I/O, no clock, no global
+state — the catalog is passed in.
+
+## Interface
+
+```python
+MESSAGES_ENDPOINTS = ("anthropic", "anthropic-compatible")
+
+def eligible(catalog: list[dict]) -> list[dict]:
+    ...
+
+def choose(
+    catalog: list[dict],
+    *,
+    difficulty: str = "standard",
+    prefer: str | None = None,
+) -> dict:
+    ...
+```
+
+- `catalog` is TokenRouter's `/v1/models` payload as a list of
+  `{"id": str, "supported_endpoint_types": [str], "tags": str}`.
+- `eligible` filters the catalog down to models this app can actually call.
+- `difficulty` is one of `"cheap"`, `"standard"`, `"hard"`.
+- `prefer` is an optional exact model id. When it is present AND eligible, it
+  wins outright — an explicit human choice always beats the router.
+- `choose` returns `{"model": str, "reason": str, "tier": str}`.
+
+## MUST NOT
+
+- MUST NOT return a model whose `supported_endpoint_types` contains none of
+  `MESSAGES_ENDPOINTS`. This app speaks the Messages API; anything else fails at
+  request time, which is a worse experience than not offering it.
+- MUST NOT return a model whose `tags` mention `Image`, `Video`, `Audio`, or
+  `Embedding`, even if its endpoint type would otherwise qualify. A run
+  generates text and calls tools.
+- MUST NOT return a `prefer` value that is not in the eligible set. Fall back to
+  the normal choice and say so in `reason`.
+- MUST NOT be non-deterministic. The same catalog and the same arguments MUST
+  return the same model every time, so two teammates never see different
+  answers. Break every tie by model id ascending.
+- MUST NOT mutate `catalog` or any dict inside it.
+- MUST NOT raise when the catalog is empty or nothing is eligible; raise
+  `NoEligibleModel` instead, which is a distinct exception the caller can catch.
+
+## MUST
+
+- MUST prefer, within a tier, a model that is already known to be fast: an id
+  containing `fast`, `haiku`, `flash`, or `lite` is the fast end of its family.
+- MUST rank families by capability, strongest first: `opus`, then `sonnet`,
+  then everything else, then `haiku`.
+- MUST map difficulty to a tier:
+  - `"cheap"` — the fastest eligible model, preferring `haiku`/`fast`/`lite`
+  - `"standard"` — a mid model, preferring `sonnet`, falling back to the fast
+    end of a stronger family before reaching for a full-size one
+  - `"hard"` — the strongest eligible model, preferring full-size `opus`
+- MUST include, in `reason`, both the tier and why that model won, in one short
+  sentence a non-engineer can read.
+- MUST return the highest-numbered version when two ids differ only by version
+  (`claude-opus-4.7` vs `claude-opus-4.8` → prefer `4.8`).
+- MUST raise `ValueError` for an unknown `difficulty`.
+
+## Examples
+
+Given a catalog containing `anthropic/claude-opus-5`,
+`anthropic/claude-opus-5-fast`, `anthropic/claude-sonnet-5`,
+`anthropic/claude-haiku-4.5`, `google/gemini-3.5-flash` (openai endpoint only),
+and `openai/gpt-5-image-mini` (image):
+
+```python
+choose(cat, difficulty="hard")["model"]      # -> "anthropic/claude-opus-5"
+choose(cat, difficulty="cheap")["model"]     # -> "anthropic/claude-haiku-4.5"
+choose(cat, difficulty="standard")["model"]  # -> "anthropic/claude-sonnet-5"
+
+# Not eligible: wrong endpoint, and an image model.
+[m["id"] for m in eligible(cat)]
+# -> never contains "google/gemini-3.5-flash" or "openai/gpt-5-image-mini"
+
+# An explicit choice wins.
+choose(cat, prefer="anthropic/claude-haiku-4.5", difficulty="hard")["model"]
+# -> "anthropic/claude-haiku-4.5"
+
+# An explicit choice that is not eligible does not.
+r = choose(cat, prefer="openai/gpt-5-image-mini", difficulty="hard")
+r["model"]                    # -> "anthropic/claude-opus-5"
+"not available" in r["reason"]  # -> True
+
+choose([], difficulty="hard")  # raises NoEligibleModel
+```
+
+## Done when
+
+- Every example above returns exactly the stated result.
+- Two calls with identical arguments always agree.
+- The module has no imports beyond the standard library.

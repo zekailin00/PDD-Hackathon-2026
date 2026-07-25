@@ -415,3 +415,116 @@ def test_unknown_power_in_an_override_is_ignored():
                          "overrides": {"design": {"teleport": True, "halt": True}}})
     assert "teleport" not in r.json()["overrides"]["design"]
     assert r.json()["effective"]["design"]["halt"] is True
+
+
+# --------------------------------------------------------------------------
+# threads -- teammates reply to each other, and the last word wins
+# --------------------------------------------------------------------------
+
+@needs_quorum
+def test_a_message_can_reply_to_another():
+    amy = join("Amy", "eng")
+    joe = join("Joe", "qa")
+    first = client.post(f"/api/rooms/{ROOM}/message",
+                        json={"user_id": amy, "content": "use cards"})
+    assert first.status_code == 200
+    mid = state.ROOMS[ROOM].messages[-1].id
+
+    r = client.post(f"/api/rooms/{ROOM}/message",
+                    json={"user_id": joe, "content": "a table reads better",
+                          "reply_to": mid})
+    assert r.status_code == 200
+    assert state.ROOMS[ROOM].messages[-1].reply_to == mid
+
+
+@needs_quorum
+def test_reply_to_an_unknown_message_is_rejected():
+    amy = join("Amy", "eng")
+    r = client.post(f"/api/rooms/{ROOM}/message",
+                    json={"user_id": amy, "content": "hi", "reply_to": 9999})
+    assert r.status_code == 400
+
+
+@needs_quorum
+def test_the_agent_is_told_a_reply_supersedes_its_parent():
+    from app import agent
+    amy = join("Amy", "eng")
+    joe = join("Joe", "qa")
+    room = state.ROOMS[ROOM]
+    room.add_message("prompt", "Amy", "eng", "use cards", author_id=amy)
+    parent = room.messages[-1].id
+    room.add_message("prompt", "Joe", "qa", "a table reads better",
+                     author_id=joe, reply_to=parent)
+
+    ctx = agent.build_messages(room, "run-1")[0]["content"]
+    assert "SUPERSEDES" in ctx
+    assert f"replying to #{parent}" in ctx
+
+
+# --------------------------------------------------------------------------
+# progress -- the room can see whose words the agent has actually taken in
+# --------------------------------------------------------------------------
+
+@needs_quorum
+def test_progress_separates_picked_up_from_waiting():
+    from app import agent
+    amy = join("Amy", "eng")
+    joe = join("Joe", "qa")
+    room = state.ROOMS[ROOM]
+    run = state.new_run(room, amy)
+
+    room.add_message("prompt", "Amy", "eng", "start here", author_id=amy)
+    agent._mark_seen(room)                       # a run consumes what exists
+    room.add_message("steer", "Joe", "qa", "wait, not like that", author_id=joe)
+
+    agent._publish_progress(room, run.id, phase="thinking", step=2)
+    p = room.progress
+    assert [x["name"] for x in p["picked_up"]] == ["Amy"]
+    assert [x["name"] for x in p["waiting"]] == ["Joe"], \
+        "Joe must be able to see the agent has not read him yet"
+
+
+@needs_quorum
+def test_progress_reports_a_bounded_percentage():
+    from app import agent
+    amy = join("Amy", "eng")
+    room = state.ROOMS[ROOM]
+    run = state.new_run(room, amy)
+    for step in (0, 3, 99):
+        agent._publish_progress(room, run.id, phase="thinking", step=step)
+        assert 0 <= room.progress["percent"] <= 100
+
+
+@needs_quorum
+def test_progress_is_complete_when_the_run_is_done():
+    from app import agent
+    amy = join("Amy", "eng")
+    room = state.ROOMS[ROOM]
+    run = state.new_run(room, amy)
+    agent._publish_progress(room, run.id, phase="done", step=agent.MAX_STEPS)
+    assert room.progress["percent"] == 100
+    assert room.progress["phase"] == "done"
+
+
+@needs_quorum
+def test_progress_appears_in_the_room_snapshot():
+    from app import agent
+    amy = join("Amy", "eng")
+    room = state.ROOMS[ROOM]
+    run = state.new_run(room, amy)
+    agent._publish_progress(room, run.id, phase="reading", step=0)
+    assert client.get(f"/api/rooms/{ROOM}").json()["progress"]["phase"] == "reading"
+
+
+# --------------------------------------------------------------------------
+# a provider failure must not hand the room someone's key
+# --------------------------------------------------------------------------
+
+def test_error_events_never_carry_exception_detail():
+    """Exception text can quote the request, and the request carries the key."""
+    import inspect
+    from app import agent
+    src = inspect.getsource(agent.run_agent)
+    tail = src[src.index("except Exception"):]
+    assert "{exc}" not in tail, "the raw exception must not reach the room"
+    assert "type(exc).__name__" in tail

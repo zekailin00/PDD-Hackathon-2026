@@ -53,6 +53,8 @@ class Message:
     role: str
     content: str
     run_id: str | None = None
+    reply_to: int | None = None      # message id this answers
+    seen_by_agent: bool = False      # has a run consumed it yet
     at: float = field(default_factory=_now)
 
 
@@ -106,6 +108,8 @@ class Room:
     intent_locked_by: str | None = None
     policy: str = "unanimous"
     role_overrides: dict = field(default_factory=dict)
+    preferred_model: str | None = None
+    progress: dict = field(default_factory=dict)   # live agent status
     participants: dict = field(default_factory=dict)
     messages: list = field(default_factory=list)
     steers: list = field(default_factory=list)
@@ -118,11 +122,11 @@ class Room:
 
     # -- messages ---------------------------------------------------------
     def add_message(self, kind, author_name, role, content,
-                    author_id=None, run_id=None) -> Message:
+                    author_id=None, run_id=None, reply_to=None) -> Message:
         self._seq += 1
         m = Message(id=self._seq, kind=kind, author_id=author_id,
                     author_name=author_name, role=role, content=content,
-                    run_id=run_id)
+                    run_id=run_id, reply_to=reply_to)
         self.messages.append(m)
         return m
 
@@ -217,6 +221,8 @@ def snapshot(room: Room) -> dict:
         "intent_locked_by": room.intent_locked_by,
         "policy": room.policy,
         "role_overrides": room.role_overrides,
+        "preferred_model": room.preferred_model,
+        "progress": room.progress,
         "participants": [vars(p) for p in room.participants.values()],
         "messages": [vars(m) for m in room.messages[-200:]],
         "ledger": room.ledger,

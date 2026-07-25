@@ -205,8 +205,8 @@ Real numbers from this build, not estimates:
 | `token_split` | `gemini/gemini-3.5-flash` | $0.0955 | 52s |
 | `approval_quorum` | `gemini/gemini-3.5-flash` | $0.0593 | 29s |
 | `role_policy` | `gemini/gemini-3.5-flash` | $0.0893 | 42s |
-| `path_sandbox` v1 | `gemini/gemini-3-flash-preview` | $0.0116 | 30s |
-| `path_sandbox` v2 | `gemini/gemini-3-flash-preview` | $0.0312 | 28s |
+| `path_sandbox` v1 | Gemini Flash family | $0.0116 | 30s |
+| `path_sandbox` v2 | `gemini/gemini-3.5-flash` | $0.0312 | 18s |
 
 **Total: about $0.29** for four modules and one corrective regeneration, billed
 to a Google Gemini key on the `--local` route. The point of the table is the
@@ -226,11 +226,11 @@ grade its own homework.
 ./scripts/pdd-sync.sh
 ```
 
-This runs `pdd --local sync --no-steer --skip-tests` for each prompt, then the
-test suite. `pdd sync` takes a BASENAME, not a path: `pdd sync token_split`
-resolves `prompts/token_split_python.prompt` via `.pddrc`. The
-`--local` flag matches this repository's setup (Codex subscription route, no
-API key — see `.pddrc` and PDD's setup summary).
+This runs `pdd --local sync --no-steer --skip-tests` with
+`gemini/gemini-3.5-flash` for each prompt, then the test suite. `pdd sync` takes
+a BASENAME, not a path: `pdd sync token_split` resolves
+`prompts/token_split_python.prompt` via `.pddrc`. The `--local` route uses the
+configured Google Gemini API key; it does not spend PDD Cloud credits.
 
 To change behaviour: **edit the prompt, re-run the script.** If you find
 yourself editing a file under `pdd/`, stop — the change belongs in
