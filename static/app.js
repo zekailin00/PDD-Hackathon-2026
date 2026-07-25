@@ -1,4 +1,4 @@
-/* Ensemble room client.
+/* CoPrompt room client.
  *
  * Every client is an equal viewer of one server-produced stream. Nothing here
  * owns the run: the browser renders what the SSE channel says, and the server
@@ -135,7 +135,7 @@ function connect() {
 
   es.addEventListener("question", (e) => {
     const d = JSON.parse(e.data);
-    flashSteer(`🙋 Ensemble is asking the room: ${d.question}`);
+    flashSteer(`🙋 CoPrompt is asking the room: ${d.question}`);
     $("composer-input").focus();
   });
 
@@ -192,7 +192,7 @@ function setState(state) {
   const hints = {
     IDLE: "Room is idle — this starts the next run's prompt.",
     RUNNING: "Run in progress — what you type queues as a steer and lands between steps.",
-    AWAITING_INPUT: "Ensemble asked the room a question — your message answers it.",
+    AWAITING_INPUT: "CoPrompt asked the room a question — your message answers it.",
     PROPOSED: "A proposal is waiting on the room's approval.",
   };
   $("composer-hint").textContent = hints[state] || "";
@@ -215,7 +215,7 @@ function addMessage(m) {
   if (m.kind === "system") {
     el.innerHTML = `<div class="body">${escapeHtml(m.content)}</div>`;
   } else {
-    const who = m.kind === "agent" || m.kind === "question" ? "Ensemble" : m.author_name;
+    const who = m.kind === "agent" || m.kind === "question" ? "CoPrompt" : m.author_name;
     const tag = m.kind === "agent" || m.kind === "question"
       ? "" : `<span class="role-tag">${ROLE_LABEL[m.role] || m.role}</span>`;
     el.innerHTML =

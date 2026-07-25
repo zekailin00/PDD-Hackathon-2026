@@ -1,4 +1,4 @@
-"""Ensemble -- HTTP surface for the shared room."""
+"""CoPrompt -- HTTP surface for the shared room."""
 
 import asyncio
 import os
@@ -8,11 +8,11 @@ from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import agent, github_pr, hub, keys, memory, providers, state
+from . import agent, github_pr, hub, keys, memory, providers, seed, state
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
-app = FastAPI(title="Ensemble", docs_url="/api/docs")
+app = FastAPI(title="CoPrompt", docs_url="/api/docs")
 
 
 def _room(room_id: str) -> state.Room:
@@ -330,6 +330,23 @@ async def open_pr(room_id: str, proposal_id: str, body: dict = Body(...)):
 # --------------------------------------------------------------------------
 # health + static
 # --------------------------------------------------------------------------
+
+@app.post("/api/rooms/{room_id}/demo-proposal")
+async def create_demo_proposal(room_id: str):
+    """Drop a ready-made proposal into the room for rehearsing the vote flow.
+
+    Lets the team practise the approval choreography without spending tokens
+    on a real run. Off unless ALLOW_DEMO_SEED=1, so it cannot be triggered
+    against a live room by accident.
+    """
+    if os.environ.get("ALLOW_DEMO_SEED", "0") != "1":
+        raise HTTPException(404, "Not enabled. Set ALLOW_DEMO_SEED=1.")
+    room = _room(room_id)
+    proposal = seed.demo_proposal(room)
+    hub.publish(room_id, "proposal", state._proposal_view(proposal))
+    hub.publish(room_id, "state", {"state": room.state})
+    return {"proposal_id": proposal.id}
+
 
 @app.get("/api/providers")
 async def list_providers():

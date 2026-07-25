@@ -4,7 +4,7 @@
 
 ## Intent
 
-The Ensemble agent has read-only access to the codebase. It can propose a
+The CoPrompt agent has read-only access to the codebase. It can propose a
 patch, but it can never write to the repository. A proposal becomes a real
 pull request only when the room agrees.
 

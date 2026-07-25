@@ -172,6 +172,9 @@ def get_or_create_room(room_id: str) -> Room:
     if room is None:
         room = Room(id=room_id, title=f"Room {room_id}")
         ROOMS[room_id] = room
+        # Imported here: seed reads state, so a module-level import would cycle.
+        from . import seed
+        seed.apply(room)
     return room
 
 

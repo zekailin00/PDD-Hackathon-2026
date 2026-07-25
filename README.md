@@ -1,4 +1,4 @@
-# Ensemble
+# CoPrompt
 
 **One AI session. The whole team. Nobody waits their turn.**
 
@@ -20,7 +20,7 @@ The PDD field guide says so in its own words:
 PDD made prompts the durable source of truth. But prompt capital is still
 written by one person at a time.
 
-**Ensemble makes it multiplayer.**
+**CoPrompt makes it multiplayer.**
 
 ## Target user
 
