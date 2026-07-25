@@ -1,10 +1,10 @@
-import type { Room } from "@/lib/domain";
+import type { AgentPhase, Room, RoomProgress } from "@/lib/domain";
 import { ROLE_LENS, ROOM_AGENT_SYSTEM } from "@/lib/prompts";
 import { can } from "@/pdd/role-policy";
 import { splitTokens } from "@/pdd/token-split";
 import {
-  addArtifact, addMessage, consumeSteers, finishRun, getRoom, publish, startRun, updateRun,
-  getRoomProvider,
+  addArtifact, addMessage, consumeSteers, finishRun, getRoom, markMessagesSeen, publish,
+  startRun, updateRun, getRoomProvider,
 } from "@/lib/server/rooms";
 import { autoRoute, streamChat, type ChatMessage } from "@/lib/server/tokenrouter";
 import type { Identity } from "@/lib/server/auth";
@@ -16,6 +16,51 @@ const PHASES = [
   "檢查驗收條件並提出可審核版本。需要預覽時輸出完整 artifact 標籤。",
 ];
 
+const PHASE_NAMES: AgentPhase[] = ["planning", "building", "reviewing"];
+
+/**
+ * Tell the room where the run is, and — the part that matters in a shared
+ * session — whose words it has actually consumed versus whose are still queued.
+ */
+export function reportProgress(input: {
+  roomId: string; runId?: string; phase: AgentPhase; step: number; label: string;
+}): void {
+  const room = getRoom(input.roomId);
+  if (!room) return;
+  const activeRun = [...room.runs].reverse().find((run) => run.status === "running");
+  const runId = input.runId || activeRun?.id;
+  if (!runId) return;
+
+  const human = room.messages.filter(
+    (message) => message.kind === "prompt" || message.kind === "steer" || message.kind === "answer",
+  );
+  const distinct = (seen: boolean) => {
+    const found = new Map<string, { userId: string; name: string; role: string }>();
+    for (const message of human) {
+      if (Boolean(message.seenByAgent) !== seen) continue;
+      if (message.userId === "agent" || found.has(message.userId)) continue;
+      found.set(message.userId, {
+        userId: message.userId, name: message.authorName, role: message.role,
+      });
+    }
+    return [...found.values()];
+  };
+
+  const progress: RoomProgress = {
+    runId,
+    phase: input.phase,
+    step: input.step,
+    totalSteps: PHASES.length,
+    percent: input.phase === "done"
+      ? 100
+      : Math.min(100, Math.round((input.step / (PHASES.length + 1)) * 100)),
+    label: input.label,
+    pickedUp: distinct(true),
+    waiting: distinct(false),
+  };
+  publish(input.roomId, { type: "progress", progress });
+}
+
 function roleContext(room: Room): string {
   return room.participants
     .map((person) => `${person.name} [${person.role.toUpperCase()}]: ${ROLE_LENS[person.role]}`)
@@ -23,8 +68,16 @@ function roleContext(room: Room): string {
 }
 
 export function recentContext(room: Room): string {
-  return room.messages.filter((message) => message.kind !== "member").slice(-20)
-    .map((message) => `[${message.authorName} · ${message.role.toUpperCase()}]\n${message.content.slice(0, 4000)}`)
+  const eligible = room.messages.filter((message) => message.kind !== "member");
+  const byId = new Map(eligible.map((message) => [message.id, message]));
+  return eligible.slice(-20)
+    .map((message) => {
+      const parent = message.replyTo ? byId.get(message.replyTo) : undefined;
+      const thread = parent
+        ? `，回覆 ${parent.authorName}「${parent.content.slice(0, 60)}」— 此則取代該說法`
+        : "";
+      return `[${message.authorName} · ${message.role.toUpperCase()}${thread}]\n${message.content.slice(0, 4000)}`;
+    })
     .join("\n\n")
     .slice(-12_000);
 }
@@ -57,6 +110,12 @@ export async function executeRoomAgent(input: {
     runId: run.id,
   });
   try {
+    markMessagesSeen(input.roomId);
+    reportProgress({
+      roomId: input.roomId, runId: run.id, phase: "reading", step: 0,
+      label: "讀取共同意圖與房間對話",
+    });
+
     const provider = getRoomProvider(input.roomId);
     const choice = await autoRoute(input.difficulty, input.prefer || room.preferredModel, provider);
     updateRun(input.roomId, run.id, { model: choice.model });
@@ -80,6 +139,7 @@ export async function executeRoomAgent(input: {
         publish(input.roomId, { type: "halted", runId: run.id, by: halt.authorName });
         return complete;
       }
+      if (steers.length) markMessagesSeen(input.roomId);
       const nudges = steers.filter((steer) => steer.kind === "nudge");
       const steerContext = nudges.length
         ? `\n${nudges.map((steer) => `[STEER from ${steer.authorName} (${steer.role})]: ${steer.content}`).join("\n")}`
@@ -88,6 +148,13 @@ export async function executeRoomAgent(input: {
       messages.push({ role: "user", content: phase });
       updateRun(input.roomId, run.id, { step: index + 1 });
       publish(input.roomId, { type: "step", runId: run.id, step: index + 1, label: PHASES[index] });
+      reportProgress({
+        roomId: input.roomId, runId: run.id, phase: PHASE_NAMES[index],
+        step: index + 1,
+        label: nudges.length
+          ? `已收到 ${nudges.map((steer) => steer.authorName).join("、")} 的導引`
+          : PHASES[index],
+      });
 
       const phaseOutput = await streamChat({
         model: choice.model,
@@ -116,6 +183,10 @@ export async function executeRoomAgent(input: {
       kind: "agent", content: complete, runId: run.id,
     });
     finishRun(input.roomId, run.id, "proposed");
+    reportProgress({
+      roomId: input.roomId, runId: run.id, phase: "done", step: PHASES.length,
+      label: "完成，等待房間審核",
+    });
     return complete;
   } catch (error) {
     finishRun(input.roomId, run.id, "error");

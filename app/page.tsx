@@ -23,6 +23,7 @@ import type {
   PublicRoom,
   Room,
   RoomEvent,
+  RoomProgress,
   RoomVisibility,
 } from "@/lib/domain";
 import { ROOM_AGENT_SYSTEM } from "@/lib/prompts";
@@ -30,7 +31,13 @@ import type { Difficulty } from "@/pdd/model-router";
 import type { Role } from "@/pdd/role-policy";
 
 const identityKey = "coprompt:identity";
-const newId = () => crypto.randomUUID();
+const newId = () => {
+  if (typeof globalThis.crypto?.randomUUID === "function") return globalThis.crypto.randomUUID();
+  if (typeof globalThis.crypto?.getRandomValues !== "function") return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const bytes = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+};
 const roleColor: Record<Role, "indigo" | "orange" | "pink" | "green" | "gray"> = {
   pm: "indigo", eng: "orange", design: "pink", qa: "green", observer: "gray",
 };
@@ -61,6 +68,7 @@ export default function Home() {
   const [replyTo, setReplyTo] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("standard");
   const [liveOutput, setLiveOutput] = useState("");
+  const [progress, setProgress] = useState<RoomProgress | null>(null);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -100,6 +108,8 @@ export default function Home() {
         setRoom((current) => current ? { ...current, participants: value.participants } : current);
       } else if (value.type === "token") {
         setLiveOutput((current) => current + value.chunk);
+      } else if (value.type === "progress") {
+        setProgress(value.progress);
       } else if (value.type === "step") {
         setNotice(`Step ${value.step}: ${value.label}`);
       } else if (value.type === "steer_applied") {
@@ -208,6 +218,7 @@ export default function Home() {
     if (!room || !prompt.trim()) return;
     setBusy(true);
     setLiveOutput("");
+    setProgress(null);
     setNotice("正在啟動 TokenRouter auto…");
     try {
       const response = await fetch("/api/agent", authorized(token, {
@@ -270,7 +281,6 @@ export default function Home() {
     if (response.ok) window.open(data.url, "_blank", "noopener,noreferrer");
     else setNotice(data.error);
   };
-
   const logout = async () => {
     if (!room || !window.confirm("確定要離開房間？你的成員身分會從房間移除。")) return;
     const response = await fetch(`/api/rooms/${room.id}`, authorized(token, undefined, "DELETE"));
@@ -339,13 +349,24 @@ export default function Home() {
             <Text size="1" color="gray" weight="bold">MEMBER CHAT</Text>
             <Badge color="green" variant="soft">Never sent to AI · 0 tokens</Badge>
           </Flex>
-          <Box className="room-messages">{room.messages.filter((message) => message.kind === "member" || message.kind === "system").slice(-20).map((message) => <Box key={message.id} className="room-message">
-            <Flex justify="between"><Text size="1" weight="bold">{message.authorName} · {message.role.toUpperCase()}</Text>{message.kind === "member" && <Button size="1" variant="ghost" onClick={() => setReplyTo(message.id)}>回覆</Button>}</Flex>
-            {message.replyTo && <Text size="1" color="gray">↳ thread {message.replyTo.slice(0, 6)}</Text>}
-            <Text as="p" size="2">{message.content}</Text>
-          </Box>)}</Box>
+          <Box className="room-messages">{room.messages
+            .filter((message) => message.kind === "member" || message.kind === "system")
+            .slice(-20)
+            .map((message) => {
+              const parent = message.replyTo
+                ? room.messages.find((item) => item.id === message.replyTo)
+                : undefined;
+              return <Box key={message.id} className={`room-message${parent ? " is-reply" : ""}${message.role === "agent" ? " by-agent" : ""}`}>
+                <Flex justify="between" align="center">
+                  <Text size="1" weight="bold">{message.authorName} · {message.role.toUpperCase()}</Text>
+                  {message.kind === "member" && <Button size="1" variant="ghost" onClick={() => setReplyTo(message.id)}>回覆</Button>}
+                </Flex>
+                {parent && <Box className="thread-quote">↳ 回覆 {parent.authorName}：{parent.content.slice(0, 70)}{parent.content.length > 70 ? "…" : ""}</Box>}
+                <Text as="p" size="2">{message.content}</Text>
+              </Box>;
+            })}</Box>
           <Box className="chat-compose">
-            {replyTo && <Flex justify="between"><Text size="1" color="gray">回覆 thread {replyTo.slice(0, 6)}</Text><Button size="1" variant="ghost" onClick={() => setReplyTo("")}>取消</Button></Flex>}
+            {replyTo && <Flex justify="between"><Text size="1" color="gray">回覆 {room.messages.find((item) => item.id === replyTo)?.authorName || "訊息"}；仍不會傳給 AI</Text><Button size="1" variant="ghost" onClick={() => setReplyTo("")}>取消</Button></Flex>}
             <TextArea value={chatDraft} onChange={(event) => setChatDraft(event.target.value)} placeholder="只傳給房間成員，不會傳給 AI…" />
             <Button size="1" variant="soft" onClick={sendMessage} disabled={!chatDraft.trim()}>送出 Member Chat</Button>
           </Box>
@@ -357,6 +378,7 @@ export default function Home() {
             <Badge color="cyan">{room.preferredModel || "TokenRouter auto"}</Badge>
           </Flex>
           {notice && <Card className="notice"><Text size="2">{notice}</Text></Card>}
+          {progress && <ProgressPanel progress={progress} meId={identity.userId} />}
           <Box className="stream-output"><pre>{liveOutput || latestOutput(room) || "共同意圖準備好後，任何有權限的角色都能啟動 agent。"}</pre></Box>
           {room.state === "RUNNING" ? <Card className="steer-box">
             <Text size="2" weight="bold">Steering Queue</Text>
@@ -402,6 +424,55 @@ function authorized(token: string, body?: unknown, method = "POST"): RequestInit
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: body === undefined ? undefined : JSON.stringify(body),
   };
+}
+
+const PHASE_LABEL: Record<RoomProgress["phase"], string> = {
+  reading: "讀取房間",
+  planning: "擬定計畫",
+  building: "產出內容",
+  reviewing: "檢查驗收",
+  done: "完成",
+};
+
+/**
+ * In a shared session the useful question is not only "how far along is it"
+ * but "has it heard me yet". Both are answered here so nobody has to guess
+ * from a moving token stream.
+ */
+function ProgressPanel({ progress, meId }: { progress: RoomProgress; meId: string }) {
+  const chip = (person: { userId: string; name: string; role: string }, got: boolean) =>
+    <span key={person.userId} className={`pickup-chip ${got ? "got" : "pending"}`}>
+      <span className="dot">{person.name.slice(0, 2).toUpperCase()}</span>
+      {person.userId === meId ? `${person.name}（你）` : person.name}
+    </span>;
+
+  return <Card className="progress-card">
+    <Box className="progress-head">
+      <span className="progress-phase">{PHASE_LABEL[progress.phase]}</span>
+      <span className="progress-count">
+        {progress.phase === "done" ? "DONE" : `STEP ${progress.step}/${progress.totalSteps}`} · {progress.percent}%
+      </span>
+    </Box>
+    <Box className="progress-track">
+      <Box className="progress-fill" style={{ width: `${progress.percent}%` }} />
+    </Box>
+    <Box className="progress-label">{progress.label}</Box>
+
+    <Box className="pickup-rows">
+      <Box className="pickup-row">
+        <span className="pickup-tag got">已讀取</span>
+        {progress.pickedUp.length
+          ? progress.pickedUp.map((person) => chip(person, true))
+          : <span className="pickup-none">尚未讀取任何人的訊息</span>}
+      </Box>
+      <Box className="pickup-row">
+        <span className="pickup-tag pending">未讀取</span>
+        {progress.waiting.length
+          ? progress.waiting.map((person) => chip(person, false))
+          : <span className="pickup-none">全部都收到了</span>}
+      </Box>
+    </Box>
+  </Card>;
 }
 
 function latestOutput(room: Room) {

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { verifyIdentity } from "@/lib/server/auth";
 import { addMessage, getRoom } from "@/lib/server/rooms";
+import { reportProgress } from "@/lib/server/run-agent";
 
 export const runtime = "nodejs";
 
@@ -20,6 +21,17 @@ export async function POST(request: Request, context: { params: Promise<{ roomId
     const message = addMessage(roomId, {
       authorName: identity.name, userId: identity.userId, role: identity.role, ...parsed.data,
     });
+    // While a run is in flight, a new message is not read yet. Say so, so the
+    // author knows whether the agent is working from their words or someone
+    // else's.
+    const room = getRoom(roomId);
+    const run = room && [...room.runs].reverse().find((item) => item.status === "running");
+    if (run && parsed.data.kind !== "member") {
+      reportProgress({
+        roomId, runId: run.id, phase: "building", step: run.step,
+        label: `${identity.name} 的訊息已送出，等待 agent 於下個檢查點讀取`,
+      });
+    }
     return Response.json({ message }, { status: 201 });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "訊息送出失敗。" }, { status: 400 });

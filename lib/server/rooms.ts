@@ -232,6 +232,17 @@ export function addMessage(roomId: string, message: Omit<RoomMessage, "id" | "cr
   return created;
 }
 
+/** Mark every human message as taken in, and report who was covered. */
+export function markMessagesSeen(roomId: string): void {
+  const room = requiredRoom(roomId);
+  for (const message of room.messages) {
+    if (message.kind === "prompt" || message.kind === "steer" || message.kind === "answer") {
+      message.seenByAgent = true;
+    }
+  }
+  room.updatedAt = new Date().toISOString();
+}
+
 export function startRun(roomId: string, startedBy: string, difficulty: Difficulty): RoomRun {
   const room = requiredRoom(roomId);
   if (room.state === "RUNNING" || room.state === "AWAITING_INPUT") {
