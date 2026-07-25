@@ -36,6 +36,14 @@ def split_tokens(
 
 - MUST return one entry for every distinct `user_id` in `contributions`.
 - MUST return only non-negative integers.
+- MUST conserve the total: `sum(result.values()) == total_tokens` exactly, for
+  every mode and every combination of weights. Integer division alone does not
+  satisfy this -- 100 tokens split three ways is 34/33/33, never 33/33/33.
+- MUST distribute the rounding remainder deterministically: give each
+  participant their floored share, then hand out the remaining tokens one at a
+  time, in descending order of the fractional part that was dropped, breaking
+  ties by `user_id` ascending. The result MUST NOT depend on dict iteration
+  order or on the order of `contributions`.
 - MUST treat a repeated `user_id` by summing that user's weights before
   splitting, and MUST emit a single entry for that user.
 - MUST raise `ValueError` when `total_tokens` is negative.
@@ -54,6 +62,21 @@ def split_tokens(
 split_tokens(90, [{"user_id": "amy", "weight": 2.0},
                   {"user_id": "joe", "weight": 1.0}])
 # -> {"amy": 60, "joe": 30}
+
+# Remainder handling. Floored shares are 33/33/33 and leave 1 token over;
+# all three dropped the same fraction, so the tie breaks on user_id.
+split_tokens(100, [{"user_id": "amy", "weight": 1.0},
+                   {"user_id": "joe", "weight": 1.0},
+                   {"user_id": "kai", "weight": 1.0}])
+# -> {"amy": 34, "joe": 33, "kai": 33}   (sums to 100, not 99)
+
+# Floored shares are 555/333/111 and leave 1 token over. The largest dropped
+# fraction is joe's (.33) -- larger than amy's (.55 -> .5 exactly? no: .5555
+# floors to 555 dropping .5555) -- compare dropped fractions, not weights.
+split_tokens(1000, [{"user_id": "amy", "weight": 5.0},
+                    {"user_id": "joe", "weight": 3.0},
+                    {"user_id": "kai", "weight": 1.0}])
+# -> sums to exactly 1000
 
 split_tokens(50, [{"user_id": "amy", "weight": 3.0},
                   {"user_id": "joe", "weight": 1.0}], mode="equal")
