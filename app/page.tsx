@@ -555,8 +555,8 @@ export default function Home() {
       }}
     /> : <main className="app-shell">
       <header className="topbar">
-        <Flex align="center" gap="3">
-          <Image className="brand-icon" src="/coprompt-appicon.png" alt="" width={38} height={38} aria-hidden="true" />
+        <Flex className="topbar-brand" align="center" gap="3">
+          <Image className="brand-icon" src="/coprompt-appicon.png" alt="" width={28} height={28} aria-hidden="true" />
           <Heading size="3">CoPrompt</Heading>
           <Badge color={room.isDemo ? "violet" : "indigo"}>{room.isDemo ? "Demo" : room.visibility}</Badge>
           {room.sourceArchive && <Badge color="cyan" title={room.sourceArchive.name}>ZIP · {room.sourceArchive.fileCount} {copy.files}</Badge>}
