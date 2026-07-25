@@ -488,7 +488,27 @@ body {
   border: var(--border) !important;
   border-radius: 6px !important;
   background: var(--paper) !important;
+  color: var(--ink) !important;
   box-shadow: var(--shadow);
+}
+
+/* 下拉選單會渲染在 portal；明確指定每一層顏色，避免瀏覽器或 Radix
+ * 的深色預設樣式造成黑底黑字。 */
+.radix-themes .rt-SelectViewport,
+.radix-themes .rt-SelectItem {
+  background: var(--paper) !important;
+  color: var(--ink) !important;
+}
+
+.radix-themes .rt-SelectItem[data-highlighted] {
+  background: var(--orange) !important;
+  color: var(--paper) !important;
+  outline: none;
+}
+
+.radix-themes .rt-SelectItemIndicator,
+.radix-themes .rt-SelectScrollButton {
+  color: currentColor !important;
 }
 
 .radix-themes .rt-TabsList {
