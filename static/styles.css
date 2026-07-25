@@ -293,3 +293,22 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   .pane { max-height: 60vh; }
   #intent { min-height: 160px; }
 }
+
+/* ---------- role powers ---------- */
+
+.modal-card.wide { width: min(720px, 100%); }
+
+.roles-grid { overflow-x: auto; margin: 14px 0; }
+.roles-grid table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.roles-grid th, .roles-grid td {
+  padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: center;
+}
+.roles-grid th { color: var(--muted); font-size: 11px; text-transform: uppercase;
+                 letter-spacing: .6px; font-weight: 600; }
+.roles-grid td:first-child, .roles-grid th:first-child {
+  text-align: left; font-family: var(--mono); font-size: 12px;
+}
+.roles-grid input[type=checkbox] { width: auto; margin: 0; cursor: pointer; accent-color: var(--accent); }
+.roles-grid input[type=number] { width: 62px; margin: 0; padding: 4px 6px;
+                                 font-family: var(--mono); font-size: 12px; text-align: center; }
+.roles-grid tr.observer td:first-child { color: var(--muted); }

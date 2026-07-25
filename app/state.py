@@ -15,13 +15,14 @@ RUNNING = "RUNNING"
 PROPOSED = "PROPOSED"
 AWAITING_INPUT = "AWAITING_INPUT"
 
-ROLES = ("pm", "eng", "design", "qa")
+ROLES = ("pm", "eng", "design", "qa", "observer")
 
 ROLE_LENS = {
     "pm": "Owns scope and acceptance criteria. Final say on WHAT is built.",
     "eng": "Owns implementation and constraints. Final say on HOW.",
     "design": "Owns UX and visual hierarchy. Final say on how it LOOKS.",
     "qa": "Owns verification. Final say on whether it is DONE.",
+    "observer": "Watching. May suggest, but holds no decision and no vote.",
 }
 
 
@@ -104,6 +105,7 @@ class Room:
     intent: str = ""
     intent_locked_by: str | None = None
     policy: str = "unanimous"
+    role_overrides: dict = field(default_factory=dict)
     participants: dict = field(default_factory=dict)
     messages: list = field(default_factory=list)
     steers: list = field(default_factory=list)
@@ -214,6 +216,7 @@ def snapshot(room: Room) -> dict:
         "intent": room.intent,
         "intent_locked_by": room.intent_locked_by,
         "policy": room.policy,
+        "role_overrides": room.role_overrides,
         "participants": [vars(p) for p in room.participants.values()],
         "messages": [vars(m) for m in room.messages[-200:]],
         "ledger": room.ledger,

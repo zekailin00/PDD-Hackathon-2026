@@ -25,6 +25,7 @@
         <option value="eng" selected>ENG — owns implementation</option>
         <option value="design">DESIGN — owns UX</option>
         <option value="qa">QA — owns verification</option>
+        <option value="observer">OBSERVER — watches and suggests, no vote</option>
       </select>
     </label>
     <button id="g-join" class="primary">Join room</button>
@@ -39,6 +40,7 @@
     <div id="peers" class="peers"></div>
     <div class="bar-right">
       <span id="state-pill" class="pill idle">IDLE</span>
+      <button id="roles-btn" class="ghost">Roles</button>
       <button id="key-btn" class="ghost">Add my API key</button>
     </div>
   </header>
@@ -94,6 +96,21 @@ One sentence describing the user-visible outcome.
       </div>
     </section>
   </main>
+</div>
+
+<div id="roles-modal" class="modal hidden">
+  <div class="modal-card wide">
+    <h2>Role powers</h2>
+    <p class="hint">What each role may do in this room. Roles without a vote are
+      never waited on by the approval gate. Enforced on the server, not by
+      hiding buttons.</p>
+    <div id="roles-grid" class="roles-grid"></div>
+    <div class="modal-actions">
+      <button id="r-save" class="primary">Save</button>
+      <button id="r-cancel" class="ghost">Cancel</button>
+    </div>
+    <p id="r-status" class="hint"></p>
+  </div>
 </div>
 
 <div id="key-modal" class="modal hidden">

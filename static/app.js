@@ -14,10 +14,13 @@ const S = {
   state: "IDLE",
   participants: [],
   proposal: null,
+  roles: null,
+  powers: null,
   es: null,
 };
 
-const ROLE_LABEL = { pm: "PM", eng: "ENG", design: "DESIGN", qa: "QA" };
+const ROLE_LABEL = { pm: "PM", eng: "ENG", design: "DESIGN", qa: "QA",
+                     observer: "OBSERVER" };
 
 /* ---------------------------------------------------------------- join --- */
 
@@ -52,6 +55,7 @@ async function join() {
   applySnapshot(data.room);
   connect();
   loadProviders();
+  loadRoles();
 }
 
 /* ------------------------------------------------------------- snapshot --- */
@@ -158,6 +162,13 @@ function connect() {
 
   es.addEventListener("ledger", (e) => renderLedger(JSON.parse(e.data).ledger));
 
+  es.addEventListener("roles", (e) => {
+    const d = JSON.parse(e.data);
+    S.roles = d.effective;
+    flashSteer(`${d.by} changed the room's role powers`);
+    applyMyPowers();
+  });
+
   es.addEventListener("ledger_unavailable", (e) => {
     $("ledger-body").innerHTML =
       `<span class="muted">${JSON.parse(e.data).message}</span>`;
@@ -189,6 +200,7 @@ function setState(state) {
   $("run-btn").classList.toggle("hidden", running);
   $("halt-btn").classList.toggle("hidden", !running);
   $("run-btn").disabled = state !== "IDLE";
+  if (S.roles) applyMyPowers();
 
   const hints = {
     IDLE: "Room is idle — this starts the next run's prompt.",
@@ -421,3 +433,80 @@ function colorDiff(text) {
 function initials(name) {
   return String(name).trim().slice(0, 2).toUpperCase();
 }
+
+/* --------------------------------------------------------- role powers --- */
+
+async function loadRoles() {
+  const r = await fetch(`/api/rooms/${S.room}/roles`);
+  if (!r.ok) return;                       // pdd modules not generated yet
+  const d = await r.json();
+  S.powers = d.powers;
+  S.roles = d.effective;
+  S.lenses = d.lenses;
+  applyMyPowers();
+}
+
+/* Reflect the room's rules in the UI. The server enforces them regardless --
+   this only avoids offering a button that would be refused. */
+function applyMyPowers() {
+  const mine = S.roles?.[S.me?.role];
+  if (!mine) return;
+  $("run-btn").disabled = !mine.run || S.state !== "IDLE";
+  $("halt-btn").disabled = !mine.halt;
+  $("intent").readOnly = !mine.edit_intent;
+  $("roles-btn").disabled = !mine.edit_intent;
+  $("lock-note").textContent = mine.edit_intent ? "" : "read-only for your role";
+
+  const pr = $("pr-btn");
+  if (pr && !mine.open_pr) {
+    pr.disabled = true;
+    pr.title = "Your role cannot open PRs in this room";
+  }
+  const approve = $("approve-btn");
+  if (approve && !mine.vote) {
+    approve.disabled = true;
+    $("reject-btn").disabled = true;
+    approve.title = "Your role has no vote in this room";
+  }
+}
+
+function renderRolesGrid() {
+  const powers = S.powers || [];
+  const rows = Object.entries(S.roles || {}).map(([role, p]) => `
+    <tr class="${role}">
+      <td>${ROLE_LABEL[role] || role}</td>
+      ${powers.map((pw) => `<td><input type="checkbox" data-role="${role}"
+          data-power="${pw}" ${p[pw] ? "checked" : ""}></td>`).join("")}
+      <td><input type="number" data-role="${role}" data-power="priority"
+          value="${p.priority}" min="0" max="999"></td>
+    </tr>`).join("");
+
+  $("roles-grid").innerHTML = `
+    <table>
+      <thead><tr><th>role</th>
+        ${powers.map((pw) => `<th>${pw.replace("_", " ")}</th>`).join("")}
+        <th>priority</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+$("roles-btn").onclick = () => {
+  renderRolesGrid();
+  $("roles-modal").classList.remove("hidden");
+};
+$("r-cancel").onclick = () => $("roles-modal").classList.add("hidden");
+
+$("r-save").onclick = async () => {
+  const overrides = {};
+  $("roles-grid").querySelectorAll("input").forEach((el) => {
+    const { role, power } = el.dataset;
+    (overrides[role] ||= {})[power] =
+      el.type === "checkbox" ? el.checked : Number(el.value);
+  });
+  const res = await post(`/api/rooms/${S.room}/roles`, { overrides }, "PUT");
+  if (!res) return;
+  S.roles = res.effective;
+  applyMyPowers();
+  $("r-status").textContent = "Saved — everyone in the room sees this now.";
+  setTimeout(() => $("roles-modal").classList.add("hidden"), 900);
+};
