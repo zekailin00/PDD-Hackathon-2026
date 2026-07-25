@@ -1,5 +1,5 @@
 import type { AgentPhase, Room, RoomProgress } from "@/lib/domain";
-import { ROLE_LENS, ROOM_AGENT_SYSTEM } from "@/lib/prompts";
+import { HTML_BLOCK_BEGIN, HTML_BLOCK_END, HTML_OUTPUT_PROTOCOL, ROLE_LENS, ROOM_AGENT_SYSTEM } from "@/lib/prompts";
 import { can } from "@/pdd/role-policy";
 import { splitTokens } from "@/pdd/token-split";
 import {
@@ -13,7 +13,7 @@ import type { Difficulty } from "@/pdd/model-router";
 const PHASES = [
   "先讀共同意圖與最近對話，列出本輪最小計畫及驗收邊界。",
   "依計畫完成核心產物。套用最新 STEER，不得擴大範圍。",
-  "檢查驗收條件並提出可審核版本。需要預覽時輸出完整 artifact 標籤。",
+  "檢查驗收條件並提出可審核版本。實作網頁時，現在輸出完整、可執行且以 artifact 標籤包住的 HTML，不可截斷。",
 ];
 
 const PHASE_NAMES: AgentPhase[] = ["planning", "building", "reviewing"];
@@ -82,14 +82,21 @@ function recentContext(room: Room): string {
 }
 
 function saveArtifacts(roomId: string, runId: string, output: string): void {
+  const markedDocument = output.split(HTML_BLOCK_BEGIN)[1]?.split(HTML_BLOCK_END)[0]?.trim()
+    .replace(/^```(?:html)?\s*/i, "").replace(/\s*```$/, "");
+  let hasMarkedHtml = false;
+  if (markedDocument && /(?:<!doctype html>|<html\b)/i.test(markedDocument)) {
+    addArtifact(roomId, { runId, kind: "html", content: markedDocument });
+    hasMarkedHtml = true;
+  }
   const pattern = /<artifact\s+kind="(html|tests|criteria)">([\s\S]*?)<\/artifact>/gi;
-  let hasHtml = false;
+  let hasHtml = hasMarkedHtml;
   for (const match of output.matchAll(pattern)) {
     const kind = match[1].toLowerCase() as "html" | "tests" | "criteria";
     const content = kind === "html"
       ? match[2].trim().replace(/^```(?:html)?\s*/i, "").replace(/\s*```$/, "")
       : match[2].trim();
-    if (content) {
+    if (content && !(hasMarkedHtml && kind === "html")) {
       if (kind === "html") hasHtml = true;
       addArtifact(roomId, { runId, kind, content });
     }
@@ -121,7 +128,7 @@ export async function executeRoomAgent(input: {
     userId: input.identity.userId,
     role: input.identity.role,
     kind: "prompt",
-    content: input.prompt,
+    content: `${input.prompt}\n\n${HTML_OUTPUT_PROTOCOL}`,
     runId: run.id,
   });
   try {
@@ -141,7 +148,7 @@ export async function executeRoomAgent(input: {
       content: `${ROOM_AGENT_SYSTEM}\n\n角色分道：\n${roleContext(room)}\n\n共同意圖：\n${room.intent}\n\n最近房間對話：\n${recentContext(room)}`,
     }, {
       role: "user",
-      content: input.prompt,
+      content: `${input.prompt}\n\n${HTML_OUTPUT_PROTOCOL}`,
     }];
     let complete = "";
 
@@ -174,6 +181,9 @@ export async function executeRoomAgent(input: {
         model: choice.model,
         messages,
         apiKey: input.apiKey,
+        // The implementation phase needs enough room for a complete browser
+        // document. Planning remains deliberately compact.
+        maxTokens: index === PHASES.length - 1 ? 10_000 : 2_500,
         onToken(token) {
           complete += token;
           updateRun(input.roomId, run.id, { output: complete });

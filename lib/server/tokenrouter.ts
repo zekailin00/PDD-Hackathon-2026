@@ -29,6 +29,7 @@ export async function streamChat(input: {
   model: string;
   messages: ChatMessage[];
   apiKey?: string;
+  maxTokens?: number;
   signal?: AbortSignal;
   onToken: (token: string) => void | Promise<void>;
 }): Promise<string> {
@@ -36,7 +37,7 @@ export async function streamChat(input: {
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: input.model, messages: input.messages, stream: true, max_tokens: 1800 }),
+    body: JSON.stringify({ model: input.model, messages: input.messages, stream: true, max_tokens: input.maxTokens ?? 8_000 }),
     signal: input.signal,
   });
   if (!response.ok || !response.body) {

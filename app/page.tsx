@@ -42,7 +42,6 @@ export default function Home() {
   const [liveOutput, setLiveOutput] = useState("");
   const [progress, setProgress] = useState<RoomProgress | null>(null);
   const [notice, setNotice] = useState("");
-  const [roomCodeCopied, setRoomCodeCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const lastRoomId = useRef("");
 
@@ -69,14 +68,18 @@ export default function Home() {
       } else if (value.type === "token") {
         setLiveOutput((current) => current + value.chunk);
       } else if (value.type === "progress") {
-        setProgress(value.progress);
+        setProgress(value.progress.phase === "done" ? null : value.progress);
       } else if (value.type === "step") {
         setNotice(`Step ${value.step}: ${value.label}`);
       } else if (value.type === "steer_applied") {
         setNotice(`⚡ 已套用 ${value.steers.length} 則導引`);
       } else if (value.type === "halted") {
+        setProgress(null);
         setNotice(`${value.by} 已中止執行`);
+      } else if (value.type === "done") {
+        setProgress(null);
       } else if (value.type === "error") {
+        setProgress(null);
         setNotice(value.message);
       }
     };
@@ -190,10 +193,7 @@ export default function Home() {
   }, [room?.id, token]);
   const copyRoomCode = async () => {
     if (!room) return;
-    try {
-      await navigator.clipboard.writeText(room.id);
-      setRoomCodeCopied(true); window.setTimeout(() => setRoomCodeCopied(false), 1600);
-    } catch { setNotice(`Share this room code: ${room.id}`); }
+    await navigator.clipboard.writeText(room.id).catch(() => undefined);
   };
 
   return <Theme appearance="dark" accentColor="indigo" grayColor="slate" radius="large">
@@ -202,7 +202,7 @@ export default function Home() {
         <header className="topbar">
           <Flex align="center" gap="3"><Box className="brand-mark">⌘</Box><Heading size="3">co-prompt</Heading><Badge color="indigo">PDD multiplayer</Badge></Flex>
           <Flex align="center" gap="2"><Badge color={room.state === "RUNNING" ? "amber" : room.state === "PROPOSED" ? "violet" : "green"}>{room.state}</Badge><Text size="2">{room.title}</Text></Flex>
-          <Flex justify="end" align="center" gap="2"><Button size="1" variant="soft" onClick={() => void copyRoomCode()}>{roomCodeCopied ? "Copied" : `Room ${room.id}`}</Button>{room.participants.slice(0, 5).map((person) => <Avatar key={person.userId} fallback={person.name.slice(0, 2).toUpperCase()} color={roleColor[person.role]} size="2" title={`${person.name} · ${person.role}`} />)}<Badge color={roleColor[identity.role]}>{identity.role.toUpperCase()}</Badge><Button size="1" color="red" variant="soft" onClick={() => void leaveRoom()}>Leave</Button></Flex>
+          <Flex justify="end" align="center" gap="2"><Button size="1" variant="soft" onClick={() => void copyRoomCode()}>Room {room.id}</Button>{room.participants.slice(0, 5).map((person) => <Avatar key={person.userId} fallback={person.name.slice(0, 2).toUpperCase()} color={roleColor[person.role]} size="2" title={`${person.name} · ${person.role}`} />)}<Badge color={roleColor[identity.role]}>{identity.role.toUpperCase()}</Badge><Button size="1" color="red" variant="soft" onClick={() => void leaveRoom()}>Leave</Button></Flex>
         </header>
 
         <section className="ensemble-grid">
@@ -302,10 +302,12 @@ function latestOutput(room: Room) {
 function ArtifactPanel({ room, onVote, onExport }: { room: Room; onVote: (vote: "approve" | "request_changes") => void; onExport: () => void }) {
   const latest = (kind: Artifact["kind"]) => [...room.artifacts].reverse().find((item) => item.kind === kind);
   const html = latest("html");
+  const output = latestOutput(room);
+  const likelyTruncatedHtml = !html && /<artifact\s+kind="html"|<!doctype html>|<html\b/i.test(output);
   return <section className="artifact-panel">
     <Flex justify="between" align="center"><Box><Text size="1" color="gray" weight="bold">TEST CAPITAL</Text><Heading size="4">產物與核准</Heading></Box>{html && <Badge>v{html.version}</Badge>}</Flex>
     <Tabs.Root defaultValue="preview"><Tabs.List><Tabs.Trigger value="preview">預覽</Tabs.Trigger><Tabs.Trigger value="code">生成程式碼</Tabs.Trigger><Tabs.Trigger value="tests">測試</Tabs.Trigger><Tabs.Trigger value="criteria">驗收</Tabs.Trigger></Tabs.List>
-      <Box className="artifact-body"><Tabs.Content value="preview">{html ? <iframe key={html.id} title="Generated artifact" sandbox="allow-scripts" srcDoc={html.content} /> : <Empty text="Agent 產出的完整 HTML 會在這個 sandboxed sub-window 預覽。" />}</Tabs.Content><Tabs.Content value="code">{html ? <pre className="generated-code">{html.content}</pre> : <Empty text="執行實作意圖後，可提取的完整 HTML 程式碼會出現在這裡。" />}</Tabs.Content><Tabs.Content value="tests"><pre>{latest("tests")?.content || "尚無測試產物。"}</pre></Tabs.Content><Tabs.Content value="criteria"><pre>{latest("criteria")?.content || "尚無驗收產物。"}</pre></Tabs.Content></Box>
+      <Box className="artifact-body"><Tabs.Content value="preview">{html ? <iframe key={html.id} title="Generated artifact" sandbox="allow-scripts" srcDoc={html.content} /> : <Empty text={likelyTruncatedHtml ? "The agent output an incomplete HTML document. Run it again to generate a complete preview." : "Agent 產出的完整 HTML 會在這個 sandboxed sub-window 預覽。"} />}</Tabs.Content><Tabs.Content value="code">{html ? <pre className="generated-code">{html.content}</pre> : <Empty text={likelyTruncatedHtml ? "Incomplete HTML was detected; no partial document was saved as a preview artifact." : "執行實作意圖後，可提取的完整 HTML 程式碼會出現在這裡。"} />}</Tabs.Content><Tabs.Content value="tests"><pre>{latest("tests")?.content || "尚無測試產物。"}</pre></Tabs.Content><Tabs.Content value="criteria"><pre>{latest("criteria")?.content || "尚無驗收產物。"}</pre></Tabs.Content></Box>
     </Tabs.Root>
     <Card className="approval-box"><Text size="2" weight="bold">Room approval gate</Text><Text as="p" size="1" color="gray">所有可投票角色核准後，才能建立 PDD Issue。</Text><Flex gap="2" wrap="wrap"><Button size="1" color="green" onClick={() => onVote("approve")}>Approve</Button><Button size="1" color="red" variant="soft" onClick={() => onVote("request_changes")}>Request changes</Button><Button size="1" variant="outline" onClick={onExport}>匯出 PDD Issue</Button></Flex></Card>
   </section>;

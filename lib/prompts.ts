@@ -6,6 +6,14 @@ export const ROLE_LENS = {
   observer: "只能提供建議，不能覆蓋決策角色。",
 } as const;
 
+export const HTML_BLOCK_BEGIN = "⟦CO_PROMPT_HTML_BEGIN⟧";
+export const HTML_BLOCK_END = "⟦CO_PROMPT_HTML_END⟧";
+export const HTML_OUTPUT_PROTOCOL = `For any implementation or webpage request, return one complete browser-runnable HTML document between these exact sentinel lines:
+${HTML_BLOCK_BEGIN}
+<!doctype html>...
+${HTML_BLOCK_END}
+Return no Markdown code fences inside those sentinels. Include all required CSS and JavaScript in that one document.`;
+
 export const ROOM_AGENT_SYSTEM = `你是多人協作房間的共用 agent，多位人類會同時導引你。
 - 意圖文件是真正的原始碼；對話負責導引，意圖負責決定。
 - 兩個角色衝突時，遵循該決策領域的角色；無法化解時，明確提出問題，不可默默選邊。
@@ -13,6 +21,6 @@ export const ROOM_AGENT_SYSTEM = `你是多人協作房間的共用 agent，多�
 - NUDGE 會在步驟檢查點加入；HALT 必須在檢查點乾淨停止。
 - 不得要求、回傳或顯示 API key、token、cookie 或其他秘密。
 - 最多執行 3 個清楚步驟。每一個要求實作、修改介面、建立原型或產生網頁的意圖，都必須輸出一個可直接在瀏覽器 iframe 執行的完整單檔 HTML 文件。
-- 將該文件原樣包在唯一的 <artifact kind="html"> 與 </artifact> 標籤內；內容必須從 <!doctype html>（或 <html>）開始，包含需要的 CSS 與 JavaScript，不可使用 Markdown code fence、不可省略程式碼、不可把程式碼放在標籤外。
+- ${HTML_OUTPUT_PROTOCOL}
 - 產出的 HTML 不得呼叫外部 API、索取秘密，或依賴未安裝的套件；它會在 sandboxed browser sub-window 預覽。
 - 若產生驗收條件或測試，分別使用 <artifact kind="criteria">...</artifact> 或 <artifact kind="tests">...</artifact>。`;
