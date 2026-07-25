@@ -4,6 +4,7 @@ import { can } from "@/pdd/role-policy";
 import { splitTokens } from "@/pdd/token-split";
 import {
   addArtifact, addMessage, consumeSteers, finishRun, getRoom, publish, startRun, updateRun,
+  getRoomProvider,
 } from "@/lib/server/rooms";
 import { autoRoute, streamChat, type ChatMessage } from "@/lib/server/tokenrouter";
 import type { Identity } from "@/lib/server/auth";
@@ -21,8 +22,8 @@ function roleContext(room: Room): string {
     .join("\n");
 }
 
-function recentContext(room: Room): string {
-  return room.messages.slice(-20)
+export function recentContext(room: Room): string {
+  return room.messages.filter((message) => message.kind !== "member").slice(-20)
     .map((message) => `[${message.authorName} · ${message.role.toUpperCase()}]\n${message.content.slice(0, 4000)}`)
     .join("\n\n")
     .slice(-12_000);
@@ -56,14 +57,15 @@ export async function executeRoomAgent(input: {
     runId: run.id,
   });
   try {
-    const choice = await autoRoute(input.difficulty, input.prefer);
+    const provider = getRoomProvider(input.roomId);
+    const choice = await autoRoute(input.difficulty, input.prefer || room.preferredModel, provider);
     updateRun(input.roomId, run.id, { model: choice.model });
     publish(input.roomId, { type: "step", runId: run.id, step: 0, label: `TokenRouter auto → ${choice.model}` });
 
     room = getRoom(input.roomId)!;
     const messages: ChatMessage[] = [{
       role: "system",
-      content: `${ROOM_AGENT_SYSTEM}\n\n角色分道：\n${roleContext(room)}\n\n共同意圖：\n${room.intent}\n\n最近房間對話：\n${recentContext(room)}`,
+      content: `${room.systemPrompt || ROOM_AGENT_SYSTEM}\n\n角色分道：\n${roleContext(room)}\n\n共同意圖：\n${room.intent}\n\n最近 AI 對話（Member Chat 已排除）：\n${recentContext(room)}`,
     }, {
       role: "user",
       content: input.prompt,
@@ -90,6 +92,7 @@ export async function executeRoomAgent(input: {
       const phaseOutput = await streamChat({
         model: choice.model,
         messages,
+        provider,
         onToken(token) {
           complete += token;
           updateRun(input.roomId, run.id, { output: complete });

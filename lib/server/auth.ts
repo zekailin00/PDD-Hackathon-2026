@@ -20,7 +20,13 @@ export function issueIdentity(identity: Identity): string {
 
 export function verifyIdentity(request: Request, roomId: string): Identity {
   const header = request.headers.get("authorization") ?? "";
-  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+  const token = header.startsWith("Bearer ")
+    ? header.slice(7)
+    : new URL(request.url).searchParams.get("token") ?? "";
+  return verifyIdentityToken(token, roomId);
+}
+
+export function verifyIdentityToken(token: string, roomId: string): Identity {
   const [payload, provided] = token.split(".");
   if (!payload || !provided) throw new Error("缺少有效的房間身分。");
   const expected = signature(payload);

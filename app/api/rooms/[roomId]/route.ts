@@ -1,25 +1,71 @@
 import { z } from "zod";
 import { verifyIdentity } from "@/lib/server/auth";
-import { getRoom, updateIntent } from "@/lib/server/rooms";
+import {
+  getRoom,
+  removeParticipant,
+  setPresence,
+  updateIntent,
+  updateRoomSettings,
+} from "@/lib/server/rooms";
 import { can } from "@/pdd/role-policy";
 
 export const runtime = "nodejs";
 
-export async function GET(_: Request, context: { params: Promise<{ roomId: string }> }) {
+const schema = z.discriminatedUnion("operation", [
+  z.object({ operation: z.literal("intent"), intent: z.string().max(50_000) }),
+  z.object({
+    operation: z.literal("settings"),
+    title: z.string().max(100).optional(),
+    visibility: z.enum(["public", "private"]).optional(),
+    systemPrompt: z.string().max(20_000).optional(),
+    preferredModel: z.string().max(200).optional(),
+    apiKey: z.string().max(500).optional(),
+    baseUrl: z.string().url().max(500).optional().or(z.literal("")),
+  }),
+  z.object({ operation: z.literal("presence"), status: z.enum(["online", "away", "offline"]) }),
+]);
+
+export async function GET(request: Request, context: { params: Promise<{ roomId: string }> }) {
   const { roomId } = await context.params;
-  const room = getRoom(roomId);
-  return room ? Response.json({ room }) : Response.json({ error: "Room not found." }, { status: 404 });
+  try {
+    verifyIdentity(request, roomId);
+    const room = getRoom(roomId);
+    return room ? Response.json({ room }) : Response.json({ error: "Room not found." }, { status: 404 });
+  } catch (error) {
+    return Response.json({ error: error instanceof Error ? error.message : "未授權。" }, { status: 401 });
+  }
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ roomId: string }> }) {
   const { roomId } = await context.params;
   try {
     const identity = verifyIdentity(request, roomId);
-    if (!can(identity.role, "edit_intent")) return Response.json({ error: "你的角色不能編輯共同意圖。" }, { status: 403 });
-    const parsed = z.object({ intent: z.string().max(50_000) }).safeParse(await request.json());
-    if (!parsed.success) return Response.json({ error: "意圖文件格式錯誤。" }, { status: 400 });
-    return Response.json({ room: updateIntent(roomId, parsed.data.intent) });
+    const parsed = schema.safeParse(await request.json());
+    if (!parsed.success) return Response.json({ error: "房間更新格式錯誤。" }, { status: 400 });
+    if (parsed.data.operation === "presence") {
+      setPresence(roomId, identity.userId, parsed.data.status);
+      return Response.json({ ok: true });
+    }
+    if (parsed.data.operation === "intent") {
+      if (!can(identity.role, "edit_intent")) {
+        return Response.json({ error: "你的角色不能編輯共同意圖。" }, { status: 403 });
+      }
+      return Response.json({ room: updateIntent(roomId, parsed.data.intent) });
+    }
+    const result = updateRoomSettings(roomId, identity.userId, parsed.data);
+    return Response.json(result);
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "更新失敗。" }, { status: 400 });
+  }
+}
+
+export async function DELETE(request: Request, context: { params: Promise<{ roomId: string }> }) {
+  const { roomId } = await context.params;
+  try {
+    const identity = verifyIdentity(request, roomId);
+    removeParticipant(roomId, identity.userId);
+    return Response.json({ ok: true });
+  } catch (error) {
+    return Response.json({ error: error instanceof Error ? error.message : "登出失敗。" }, { status: 400 });
   }
 }

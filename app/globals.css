@@ -28,6 +28,9 @@ body { margin: 0; background: #0c0d11; color: #f0f0f5; font-family: Manrope, Ari
 .change-card { margin-top: 10px; padding: 10px !important; background: #1c1d28 !important; }.working { margin: 0 15px 10px; }
 .composer { margin: 0 15px 15px; padding: 10px; border: 1px solid #363743; border-radius: 9px; background: #1b1c23; }.composer .rt-TextAreaInput { min-height: 70px; resize: none; background: transparent !important; }
 .welcome { display: grid; min-height: 100vh; place-items: center; padding: 22px; background: radial-gradient(circle at 50% 0, #2a2750 0, #0c0d11 52%); }.welcome-card { width: min(100%, 520px); padding: 34px !important; background: rgba(22, 23, 31, .92) !important; }.welcome-logo { width: 42px; height: 42px; margin-bottom: 22px; font-size: 25px; }.diff { margin: 0; color: #8ff0ae; font-family: 'DM Mono', monospace; white-space: pre-wrap; }.rt-DialogContent { background: #191a21 !important; }
+.welcome-card-wide { width: min(100%, 680px); }
+.presence-avatar { position: relative; display: inline-flex; }
+.presence-avatar > span { position: absolute; right: -1px; bottom: -1px; width: 9px; height: 9px; border: 2px solid #101116; border-radius: 50%; }
 .ensemble-grid { height: calc(100vh - 68px); display: grid; grid-template-columns: minmax(280px, .85fr) minmax(360px, 1.25fr) minmax(320px, 1fr); }
 .intent-panel, .run-panel, .artifact-panel { min-width: 0; padding: 18px; overflow: hidden; }
 .intent-panel { display: flex; flex-direction: column; gap: 12px; border-right: 1px solid #292a32; background: #111217; }

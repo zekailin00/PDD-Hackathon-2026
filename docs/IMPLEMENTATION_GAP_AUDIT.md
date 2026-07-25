@@ -4,6 +4,12 @@
 
 - Next.js 15, Node 22+, TypeScript, server-only provider credentials.
 - Shared server room with SSE broadcast, role lanes, intent document, room chat.
+- Separate room creation and dropdown-based joining, public/private invite
+  links, creator settings, presence states, confirmed logout, and Demo-only
+  seed data.
+- Member Chat is explicitly excluded from agent context and token allocation.
+- Optional per-room provider keys stay in server process memory and never
+  appear in room snapshots.
 - `IDLE`, `RUNNING`, `PROPOSED` lifecycle and atomic single-run gate.
 - Steering Queue with `NUDGE` and clean-checkpoint `HALT`.
 - TokenRouter live-catalog automatic model selection through OpenAI-compatible
@@ -37,7 +43,7 @@
 
 - mem0 decision memory, Respan gateway/dashboard, RocketRide pipeline,
   ElevenLabs announcements, and optional MiniMax path.
-- Render service and environment configuration; public mobile-network smoke test.
+- Public mobile-network smoke test after each production deployment.
 - Seeded demo room, QR join slide, offline QR printout, and 90-second backup video.
 - Public GitHub README architecture/AI disclosure and PDD evidence links.
 - RocketRide `/submit`, Discord/Instagram actions, and LinkedIn post.
