@@ -5,7 +5,7 @@ export type ProviderConfig = { apiKey?: string; baseUrl?: string };
 
 function config(override: ProviderConfig = {}) {
   const apiKey = override.apiKey || process.env.TOKENROUTER_API_KEY;
-  if (!apiKey) throw new Error("伺服器尚未設定 TOKENROUTER_API_KEY。");
+  if (!apiKey) throw new Error("The server has not configured TOKENROUTER_API_KEY.");
   return {
     apiKey,
     baseUrl: (override.baseUrl || process.env.TOKENROUTER_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, ""),

@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   try {
     const { payload, projectZip } = await readRequest(request);
     const parsed = schema.safeParse(payload);
-    if (!parsed.success) return Response.json({ error: "房間資料格式錯誤。" }, { status: 400 });
+    if (!parsed.success) return Response.json({ error: "The room data is invalid." }, { status: 400 });
     const member = {
       userId: parsed.data.userId,
       name: parsed.data.name,
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
     return Response.json({ room: result.room, token, inviteCode: result.inviteCode });
   } catch (error) {
     return Response.json(
-      { error: error instanceof Error ? error.message : "房間操作失敗。" },
+      { error: error instanceof Error ? error.message : "The room operation failed." },
       { status: 400 },
     );
   }

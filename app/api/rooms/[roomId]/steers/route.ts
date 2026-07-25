@@ -17,12 +17,12 @@ export async function POST(request: Request, context: { params: Promise<{ roomId
   try {
     const identity = verifyIdentity(request, roomId);
     const parsed = schema.safeParse(await request.json());
-    if (!parsed.success) return Response.json({ error: "導引格式錯誤。" }, { status: 400 });
+    if (!parsed.success) return Response.json({ error: "The steering request is invalid." }, { status: 400 });
     const power = parsed.data.kind === "halt" ? "halt" : "steer";
-    if (!can(identity.role, power)) return Response.json({ error: `你的角色不能執行 ${power}。` }, { status: 403 });
+    if (!can(identity.role, power)) return Response.json({ error: `Your role cannot ${power} this run.` }, { status: 403 });
     const room = getRoom(roomId);
     if (!room || !["RUNNING", "AWAITING_INPUT"].includes(room.state)) {
-      return Response.json({ error: "目前沒有執行中的 agent。" }, { status: 409 });
+      return Response.json({ error: "There is no active agent run." }, { status: 409 });
     }
     const steer = queueSteer(roomId, {
       ...parsed.data,
@@ -37,11 +37,11 @@ export async function POST(request: Request, context: { params: Promise<{ roomId
     if (run) {
       reportProgress({
         roomId, runId: run.id, phase: "building", step: run.step,
-        label: `${identity.name} 的${parsed.data.kind === "halt" ? "中止" : "導引"}已排隊，等待下個檢查點`,
+        label: `${identity.name}'s ${parsed.data.kind === "halt" ? "halt" : "steering note"} is queued for the next checkpoint`,
       });
     }
     return Response.json({ steer }, { status: 201 });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "導引失敗。" }, { status: 400 });
+    return Response.json({ error: error instanceof Error ? error.message : "The steering request failed." }, { status: 400 });
   }
 }

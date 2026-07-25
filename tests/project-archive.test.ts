@@ -33,7 +33,7 @@ describe("project ZIP import", () => {
     await expect(readProjectArchive(zipFile({
       "../secret.txt": "not safe",
       "node_modules/pkg/index.js": "ignored",
-    }))).rejects.toThrow(/找不到可讀取/);
+    }))).rejects.toThrow(/No readable code or text files/);
   });
 
   it("creates a room from multipart form data with a ZIP", async () => {

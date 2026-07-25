@@ -30,7 +30,7 @@ describe("production room boundaries", () => {
       roomId: created.room.id,
       inviteCode: "wrong",
       participant: { userId: "guest", name: "Guest", role: "qa" },
-    })).toThrow(/邀請連結/);
+    })).toThrow(/valid invite link/);
 
     const joined = joinRoom({
       roomId: created.room.id,
@@ -86,13 +86,13 @@ describe("production room boundaries", () => {
       participant: creator,
     });
     expect(demo?.isDemo).toBe(true);
-    expect(demo?.messages.some((message) => message.content.includes("唯一含有示範資料"))).toBe(true);
+    expect(demo?.messages.some((message) => message.content.includes("only room with seeded demo data"))).toBe(true);
     expect(demo?.messages.some((message) => message.kind === "member")).toBe(true);
     expect(demo?.runs.some((run) => run.status === "proposed" && run.output)).toBe(true);
     expect(demo?.artifacts.map((artifact) => artifact.kind).sort()).toEqual(["criteria", "html", "tests"]);
     expect(demo?.state).toBe("PROPOSED");
     expect(created.room.isDemo).toBeUndefined();
-    expect(created.room.messages.some((message) => message.content.includes("示範資料"))).toBe(false);
+    expect(created.room.messages.some((message) => message.content.includes("seeded demo data"))).toBe(false);
     expect(created.room.runs).toHaveLength(0);
     expect(created.room.artifacts).toHaveLength(0);
   });

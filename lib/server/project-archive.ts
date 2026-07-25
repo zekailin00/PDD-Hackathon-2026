@@ -53,9 +53,9 @@ function cleanArchiveName(name: string): string {
 }
 
 export async function readProjectArchive(file: File): Promise<ProjectArchive> {
-  if (!file.name.toLowerCase().endsWith(".zip")) throw new Error("請上傳 .zip 專案檔。");
-  if (!file.size) throw new Error("ZIP 檔案是空的。");
-  if (file.size > MAX_ZIP_BYTES) throw new Error("ZIP 檔案不可超過 10 MB。");
+  if (!file.name.toLowerCase().endsWith(".zip")) throw new Error("Please upload a .zip project.");
+  if (!file.size) throw new Error("The ZIP file is empty.");
+  if (file.size > MAX_ZIP_BYTES) throw new Error("The ZIP file must be 10 MB or smaller.");
 
   let entryCount = 0;
   let acceptedCount = 0;
@@ -66,7 +66,7 @@ export async function readProjectArchive(file: File): Promise<ProjectArchive> {
     filter(info) {
       entryCount += 1;
       if (entryCount > MAX_ARCHIVE_ENTRIES) {
-        throw new Error("ZIP 內容過多；最多接受 500 個項目。");
+        throw new Error("The ZIP contains too many entries. The maximum is 500.");
       }
       if (!safePath(info.name) || !isTextFile(info.name) || info.originalSize === 0) return false;
       if (info.originalSize > MAX_FILE_BYTES) {
@@ -91,7 +91,7 @@ export async function readProjectArchive(file: File): Promise<ProjectArchive> {
       content: decoder.decode(bytes),
     }));
 
-  if (!files.length) throw new Error("ZIP 內找不到可讀取的程式碼或文字檔。");
+  if (!files.length) throw new Error("No readable code or text files were found in the ZIP.");
 
   return {
     name: cleanArchiveName(file.name),

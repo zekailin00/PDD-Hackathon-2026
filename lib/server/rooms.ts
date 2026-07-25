@@ -100,7 +100,7 @@ function seedDemoRoom(): void {
     preferredModel: "",
     isDemo: true,
     state: "PROPOSED",
-    intent: "## Goal\n建立一個清楚、可共同審核的 launch checklist。\n\n## Acceptance criteria\n1. 產物可直接在瀏覽器預覽\n2. 頁面包含三項 launch checklist\n3. 測試與驗收條件一致\n\n## Must not\n- 不得呼叫外部 API\n- 不得洩漏任何 API key\n",
+    intent: "## Goal\nCreate a clear launch checklist the whole room can review.\n\n## Acceptance criteria\n1. The artifact renders directly in the browser preview.\n2. The page contains three launch checklist items.\n3. Tests match the acceptance criteria.\n\n## Must not\n- Do not call external APIs.\n- Do not expose API keys or other secrets.\n",
     participants: [],
     messages: [
       {
@@ -109,7 +109,7 @@ function seedDemoRoom(): void {
         userId: "agent",
         role: "agent",
         kind: "system",
-        content: "這是唯一含有示範資料的 Demo 房間。你可以直接查看共同意圖、Member Chat、agent proposal、artifact 預覽與核准流程。",
+        content: "This is the only room with seeded demo data. Explore the shared intent, Member Chat, agent proposal, artifact preview, and approval flow.",
         createdAt: timestamp,
       },
       {
@@ -118,7 +118,7 @@ function seedDemoRoom(): void {
         userId: "demo-pm",
         role: "pm",
         kind: "member",
-        content: "我已把 launch checklist 的目標與驗收條件放進共同意圖，請大家確認範圍。",
+        content: "I added the launch checklist goal and acceptance criteria to the shared intent. Please confirm the scope.",
         createdAt: timestamp,
       },
       {
@@ -127,7 +127,7 @@ function seedDemoRoom(): void {
         userId: "demo-eng",
         role: "eng",
         kind: "member",
-        content: "範圍清楚；HTML 保持單檔、無外部 API，這樣 iframe 可以直接預覽。",
+        content: "The scope is clear. Keep the HTML self-contained and avoid external APIs so it can run directly in the preview iframe.",
         replyTo: kickoffMessageId,
         createdAt: timestamp,
       },
@@ -137,7 +137,7 @@ function seedDemoRoom(): void {
         userId: "demo-pm",
         role: "pm",
         kind: "prompt",
-        content: "依共同意圖建立 launch checklist 預覽，並附上驗收條件與測試。",
+        content: "Build the launch checklist preview from the shared intent and include acceptance criteria and tests.",
         runId,
         seenByAgent: true,
         createdAt: timestamp,
@@ -264,8 +264,8 @@ export function createRoom(input: {
       role: "agent",
       kind: "system",
       content: input.sourceArchive
-        ? `房間已準備好，已載入 ${input.sourceArchive.name} 的 ${input.sourceArchive.fileCount} 個文字檔${input.sourceArchive.truncated ? "（已依安全限制截斷）" : ""}。共同編寫意圖，然後啟動 agent。`
-        : "房間已準備好。共同編寫意圖，然後啟動 agent。",
+        ? `The room is ready. Loaded ${input.sourceArchive.fileCount} text file(s) from ${input.sourceArchive.name}${input.sourceArchive.truncated ? " (truncated to the safety limit)" : ""}. Co-author the shared intent, then start the agent.`
+        : "The room is ready. Co-author the shared intent, then start the agent.",
       createdAt: timestamp,
     }],
     runs: [],
@@ -295,7 +295,7 @@ export function joinRoom(input: {
   if (!room) throw new Error("Room not found.");
   const secret = store.secrets.get(room.id);
   if (room.visibility === "private" && input.inviteCode !== secret?.inviteCode) {
-    throw new Error("這個私人房間需要有效邀請連結。");
+    throw new Error("This private room requires a valid invite link.");
   }
   const joined = participant(input.participant);
   room.participants = [...room.participants.filter((item) => item.userId !== joined.userId), joined];
@@ -318,8 +318,8 @@ export function updateRoomSettings(
   },
 ): { room: Room; inviteCode: string } {
   const room = requiredRoom(roomId);
-  if (room.createdBy !== userId) throw new Error("只有建立者可以修改房間設定。");
-  if (room.isDemo) throw new Error("Demo 房間設定不可修改。");
+  if (room.createdBy !== userId) throw new Error("Only the room creator can change room settings.");
+  if (room.isDemo) throw new Error("Demo room settings cannot be changed.");
   if (patch.title !== undefined) room.title = patch.title.trim().slice(0, 100) || room.title;
   if (patch.visibility !== undefined) room.visibility = patch.visibility;
   if (patch.systemPrompt !== undefined) room.systemPrompt = patch.systemPrompt.trim().slice(0, 20_000) || ROOM_AGENT_SYSTEM;
@@ -344,7 +344,7 @@ export function getRoomSourceContext(roomId: string): string {
 
 export function updateIntent(roomId: string, intent: string): Room {
   const room = requiredRoom(roomId);
-  if (room.state === "RUNNING") throw new Error("執行中不能直接改意圖；請改用 NUDGE。");
+  if (room.state === "RUNNING") throw new Error("The shared intent cannot be edited during a run. Use NUDGE instead.");
   room.intent = intent.slice(0, 50_000);
   room.updatedAt = now();
   publishSnapshot(room);
@@ -392,7 +392,7 @@ export function markMessagesSeen(roomId: string): void {
 export function startRun(roomId: string, startedBy: string, difficulty: Difficulty): RoomRun {
   const room = requiredRoom(roomId);
   if (room.state === "RUNNING" || room.state === "AWAITING_INPUT") {
-    throw new Error("另一位隊友已經啟動 agent。");
+    throw new Error("Another teammate has already started the agent.");
   }
   const run: RoomRun = {
     id: randomUUID(), status: "running", startedBy, difficulty, output: "", step: 0, createdAt: now(),
