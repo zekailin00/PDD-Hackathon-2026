@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Avatar, Badge, Box, Button, Card, Flex, Heading, Select, Separator, Tabs, Text, TextArea, TextField, Theme,
 } from "@radix-ui/themes";
-import type { Artifact, Room, RoomEvent } from "@/lib/domain";
+import type { Artifact, Room, RoomEvent, RoomProgress } from "@/lib/domain";
 import type { Difficulty } from "@/pdd/model-router";
 import type { Role } from "@/pdd/role-policy";
 
@@ -40,6 +40,7 @@ export default function Home() {
   const [replyTo, setReplyTo] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("standard");
   const [liveOutput, setLiveOutput] = useState("");
+  const [progress, setProgress] = useState<RoomProgress | null>(null);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const lastRoomId = useRef("");
@@ -66,6 +67,8 @@ export default function Home() {
         setIntentDraft(value.room.intent);
       } else if (value.type === "token") {
         setLiveOutput((current) => current + value.chunk);
+      } else if (value.type === "progress") {
+        setProgress(value.progress);
       } else if (value.type === "step") {
         setNotice(`Step ${value.step}: ${value.label}`);
       } else if (value.type === "steer_applied") {
@@ -109,7 +112,7 @@ export default function Home() {
 
   const run = async () => {
     if (!room || !prompt.trim()) return;
-    setBusy(true); setLiveOutput(""); setNotice("正在啟動 TokenRouter auto…");
+    setBusy(true); setLiveOutput(""); setProgress(null); setNotice("正在啟動 TokenRouter auto…");
     try {
       if (!apiKey) { setNotice("Add a TokenRouter API key before running the agent."); return; }
       const response = await fetch("/api/agent", authorized({ roomId: room.id, prompt, difficulty, apiKey }));
@@ -181,13 +184,24 @@ export default function Home() {
             <TextArea className="intent-editor" value={intentDraft} onChange={(event) => setIntentDraft(event.target.value)} disabled={room.state === "RUNNING"} />
             <Separator size="4" />
             <Text size="1" color="gray" weight="bold">ROOM CHAT</Text>
-            <Box className="room-messages">{room.messages.slice(-12).map((message) => <Box key={message.id} className="room-message"><Flex justify="between"><Text size="1" weight="bold">{message.authorName} · {message.role.toUpperCase()}</Text><Button size="1" variant="ghost" onClick={() => setReplyTo(message.id)}>回覆</Button></Flex>{message.replyTo && <Text size="1" color="gray">↳ thread {message.replyTo.slice(0, 6)}</Text>}<Text as="p" size="2">{message.content}</Text></Box>)}</Box>
-            <Box className="chat-compose">{replyTo && <Flex justify="between"><Text size="1" color="gray">回覆 thread {replyTo.slice(0, 6)}</Text><Button size="1" variant="ghost" onClick={() => setReplyTo("")}>取消</Button></Flex>}<TextArea value={chatDraft} onChange={(event) => setChatDraft(event.target.value)} placeholder="房間訊息…" /><Button size="1" variant="soft" onClick={sendMessage} disabled={!chatDraft.trim()}>送出</Button></Box>
+            <Box className="room-messages">{room.messages.slice(-12).map((message) => {
+              const parent = message.replyTo ? room.messages.find((item) => item.id === message.replyTo) : undefined;
+              return <Box key={message.id} className={`room-message${parent ? " is-reply" : ""}${message.role === "agent" ? " by-agent" : ""}`}>
+                <Flex justify="between" align="center">
+                  <Text size="1" weight="bold">{message.authorName} · {message.role.toUpperCase()}</Text>
+                  <Button size="1" variant="ghost" onClick={() => setReplyTo(message.id)}>回覆</Button>
+                </Flex>
+                {parent && <Box className="thread-quote">↳ 回覆 {parent.authorName}：{parent.content.slice(0, 70)}{parent.content.length > 70 ? "…" : ""}</Box>}
+                <Text as="p" size="2">{message.content}</Text>
+              </Box>;
+            })}</Box>
+            <Box className="chat-compose">{replyTo && <Flex justify="between" align="center"><Text size="1" color="gray">回覆 {room.messages.find((item) => item.id === replyTo)?.authorName || "訊息"}（agent 會以你的回覆為準）</Text><Button size="1" variant="ghost" onClick={() => setReplyTo("")}>取消</Button></Flex>}<TextArea value={chatDraft} onChange={(event) => setChatDraft(event.target.value)} placeholder="房間訊息…" /><Button size="1" variant="soft" onClick={sendMessage} disabled={!chatDraft.trim()}>送出</Button></Box>
           </section>
 
           <section className="run-panel">
             <Flex justify="between" align="center"><Box><Text size="1" color="gray" weight="bold">SHARED AGENT</Text><Heading size="4">即時執行</Heading></Box><Badge color="cyan">TokenRouter auto</Badge></Flex>
             {notice && <Card className="notice"><Text size="2">{notice}</Text></Card>}
+            {progress && <ProgressPanel progress={progress} meId={identity.userId} />}
             <Box className="stream-output"><pre>{liveOutput || latestOutput(room) || "共同意圖準備好後，任何有權限的角色都能啟動 agent。"}</pre></Box>
             {!apiKey ? <Card className="run-box"><Text size="2" weight="bold">Connect TokenRouter</Text><Text size="1" color="gray">Your key stays in this browser and is sent only when you run the agent.</Text><TextField.Root type="password" value={apiKeyDraft} onChange={(event) => setApiKeyDraft(event.target.value)} placeholder="tr_..." /><Button size="2" onClick={saveApiKey} disabled={!apiKeyDraft.trim()}>Save API key</Button></Card> : room.state === "RUNNING" ? <Card className="steer-box">
               <Text size="2" weight="bold">Steering Queue</Text>
@@ -203,6 +217,55 @@ export default function Home() {
         </section>
       </main>}
   </Theme>;
+}
+
+const PHASE_LABEL: Record<RoomProgress["phase"], string> = {
+  reading: "讀取房間",
+  planning: "擬定計畫",
+  building: "產出內容",
+  reviewing: "檢查驗收",
+  done: "完成",
+};
+
+/**
+ * In a shared session the useful question is not only "how far along is it"
+ * but "has it heard me yet". Both are answered here so nobody has to guess
+ * from a moving token stream.
+ */
+function ProgressPanel({ progress, meId }: { progress: RoomProgress; meId: string }) {
+  const chip = (person: { userId: string; name: string; role: string }, got: boolean) =>
+    <span key={person.userId} className={`pickup-chip ${got ? "got" : "pending"}`}>
+      <span className="dot">{person.name.slice(0, 2).toUpperCase()}</span>
+      {person.userId === meId ? `${person.name}（你）` : person.name}
+    </span>;
+
+  return <Card className="progress-card">
+    <Box className="progress-head">
+      <span className="progress-phase">{PHASE_LABEL[progress.phase]}</span>
+      <span className="progress-count">
+        {progress.phase === "done" ? "DONE" : `STEP ${progress.step}/${progress.totalSteps}`} · {progress.percent}%
+      </span>
+    </Box>
+    <Box className="progress-track">
+      <Box className="progress-fill" style={{ width: `${progress.percent}%` }} />
+    </Box>
+    <Box className="progress-label">{progress.label}</Box>
+
+    <Box className="pickup-rows">
+      <Box className="pickup-row">
+        <span className="pickup-tag got">已讀取</span>
+        {progress.pickedUp.length
+          ? progress.pickedUp.map((person) => chip(person, true))
+          : <span className="pickup-none">尚未讀取任何人的訊息</span>}
+      </Box>
+      <Box className="pickup-row">
+        <span className="pickup-tag pending">未讀取</span>
+        {progress.waiting.length
+          ? progress.waiting.map((person) => chip(person, false))
+          : <span className="pickup-none">全部都收到了</span>}
+      </Box>
+    </Box>
+  </Card>;
 }
 
 function latestOutput(room: Room) {

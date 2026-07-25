@@ -2,6 +2,7 @@ import { z } from "zod";
 import { verifyIdentity } from "@/lib/server/auth";
 import { getRoom, queueSteer } from "@/lib/server/rooms";
 import { can } from "@/pdd/role-policy";
+import { reportProgress } from "@/lib/server/run-agent";
 
 export const runtime = "nodejs";
 
@@ -29,6 +30,16 @@ export async function POST(request: Request, context: { params: Promise<{ roomId
       authorName: identity.name,
       role: identity.role,
     });
+    // Show the room immediately that this steer is queued but not yet read,
+    // otherwise nobody sees the "waiting" state at all -- it would be consumed
+    // silently at the next checkpoint.
+    const run = [...room.runs].reverse().find((item) => item.status === "running");
+    if (run) {
+      reportProgress({
+        roomId, runId: run.id, phase: "building", step: run.step,
+        label: `${identity.name} 的${parsed.data.kind === "halt" ? "中止" : "導引"}已排隊，等待下個檢查點`,
+      });
+    }
     return Response.json({ steer }, { status: 201 });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "導引失敗。" }, { status: 400 });

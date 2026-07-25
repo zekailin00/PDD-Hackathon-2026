@@ -20,6 +20,8 @@ export type RoomMessage = {
   content: string;
   runId?: string;
   replyTo?: string;
+  /** Set once a run has actually fed this message to the model. */
+  seenByAgent?: boolean;
   createdAt: string;
 };
 
@@ -78,11 +80,31 @@ export type Room = {
   updatedAt: string;
 };
 
+export type AgentPhase = "reading" | "planning" | "building" | "reviewing" | "done";
+
+/**
+ * A shared session has a fairness problem a solo one does not: when four people
+ * type at once, each needs to know whether the agent has taken THEIR words in
+ * yet, or is still working from someone else's. Guessing from a token stream is
+ * not good enough, so the room is told outright.
+ */
+export type RoomProgress = {
+  runId: string;
+  phase: AgentPhase;
+  step: number;
+  totalSteps: number;
+  percent: number;
+  label: string;
+  pickedUp: { userId: string; name: string; role: string }[];
+  waiting: { userId: string; name: string; role: string }[];
+};
+
 export type RoomEvent =
   | { type: "snapshot"; room: Room }
   | { type: "presence"; participants: Participant[] }
   | { type: "token"; runId: string; chunk: string }
   | { type: "step"; runId: string; step: number; label: string }
+  | { type: "progress"; progress: RoomProgress }
   | { type: "steer_applied"; runId: string; steers: Steer[] }
   | { type: "halted"; runId: string; by: string }
   | { type: "artifact"; artifact: Artifact }
