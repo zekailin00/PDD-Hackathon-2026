@@ -71,6 +71,13 @@ const COPY = {
     zipRequired: "Please choose a .zip file.",
     systemPromptLabel: "Shared agent System Prompt",
     systemPromptHelp: "These instructions apply to every AI run in this room.",
+    memoryLabel: "Long-term room memory",
+    memoryHelp: "Remember approved room decisions. Member Chat, secrets, uploaded source, and generated code are never stored.",
+    memoryOn: "Memory on",
+    memoryOff: "Memory off",
+    memoryPending: "Saving approved decision…",
+    memoryQueued: "Approved decision queued for memory",
+    memoryError: "Memory save unavailable",
     files: "files",
     creating: "Creating…",
     createFailed: "Could not create the room.",
@@ -167,6 +174,13 @@ const COPY = {
     zipRequired: "請選擇 .zip 檔案。",
     systemPromptLabel: "共用 Agent System Prompt",
     systemPromptHelp: "這些指令會套用到此房間的每一次 AI 執行。",
+    memoryLabel: "房間長期記憶",
+    memoryHelp: "只記住已核准的房間決策；Member Chat、秘密、上傳原始碼與生成程式碼永不儲存。",
+    memoryOn: "記憶已開啟",
+    memoryOff: "記憶已關閉",
+    memoryPending: "正在儲存核准決策…",
+    memoryQueued: "核准決策已排入記憶",
+    memoryError: "記憶儲存目前無法使用",
     files: "個檔案",
     creating: "建立中…",
     createFailed: "建立房間失敗。",
@@ -271,6 +285,7 @@ export default function Home() {
   const [preferredModel, setPreferredModel] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [systemPrompt, setSystemPrompt] = useState(ROOM_AGENT_SYSTEM);
+  const [memoryEnabled, setMemoryEnabled] = useState(false);
   const [projectZip, setProjectZip] = useState<File | null>(null);
   const [intentDraft, setIntentDraft] = useState("");
   const [prompt, setPrompt] = useState("");
@@ -404,6 +419,7 @@ export default function Home() {
       apiKey,
       baseUrl: "https://api.tokenrouter.com/v1",
     })) form.set(key, value);
+    form.set("memoryEnabled", String(memoryEnabled));
     if (projectZip) form.set("projectZip", projectZip);
     setBusy(true);
     try {
@@ -549,6 +565,7 @@ export default function Home() {
         name, setName, role, setRole, title, setTitle, roomCode, setRoomCode,
         publicRooms, urlInviteCode, visibility, setVisibility, preferredModel,
         setPreferredModel, apiKey, setApiKey, systemPrompt, setSystemPrompt,
+        memoryEnabled, setMemoryEnabled,
         projectZip, setProjectZip,
         createSession, joinSession, busy, notice, copy, locale, setLocale,
         themeMode, setThemeMode,
@@ -563,6 +580,7 @@ export default function Home() {
         </Flex>
         <Flex align="center" gap="2">
           <Badge color={room.state === "RUNNING" ? "amber" : room.state === "PROPOSED" ? "violet" : "green"}>{room.state}</Badge>
+          <Badge color={room.memoryEnabled ? "green" : "gray"}>{room.memoryEnabled ? copy.memoryOn : copy.memoryOff}</Badge>
           <Text size="2">{room.title}</Text>
         </Flex>
         <Flex className="topbar-actions" justify="end" align="center">
@@ -771,6 +789,14 @@ function latestOutput(room: Room) {
 function ArtifactPanel({ room, onVote, onExport, copy }: { room: Room; onVote: (vote: "approve" | "request_changes") => void; onExport: () => void; copy: Copy }) {
   const latest = (kind: Artifact["kind"]) => [...room.artifacts].reverse().find((item) => item.kind === kind);
   const html = latest("html");
+  const latestRun = room.runs.at(-1);
+  const memoryStatus = latestRun?.memoryStatus === "pending"
+    ? copy.memoryPending
+    : latestRun?.memoryStatus === "queued"
+      ? copy.memoryQueued
+      : latestRun?.memoryStatus === "error"
+        ? copy.memoryError
+        : "";
   return <section className="artifact-panel">
     <Flex justify="between" align="center"><Box><Text size="1" color="gray" weight="bold">TEST CAPITAL</Text><Heading size="4">{copy.artifactsApproval}</Heading></Box>{html && <Badge>v{html.version}</Badge>}</Flex>
     <Tabs.Root defaultValue="preview">
@@ -782,7 +808,14 @@ function ArtifactPanel({ room, onVote, onExport, copy }: { room: Room; onVote: (
         <Tabs.Content value="criteria"><pre>{latest("criteria")?.content || copy.criteriaEmpty}</pre></Tabs.Content>
       </Box>
     </Tabs.Root>
-    <Card className="approval-box"><Text size="2" weight="bold">{copy.approvalGate}</Text><Text as="p" size="1" color="gray">{copy.approvalHelp}</Text><Flex gap="2" wrap="wrap"><Button size="1" color="green" onClick={() => onVote("approve")}>{copy.approve}</Button><Button size="1" color="red" variant="soft" onClick={() => onVote("request_changes")}>{copy.requestChanges}</Button><Button size="1" variant="outline" onClick={onExport}>{copy.exportIssue}</Button></Flex></Card>
+    <Card className="approval-box">
+      <Flex justify="between" align="center" gap="2">
+        <Text size="2" weight="bold">{copy.approvalGate}</Text>
+        {room.memoryEnabled && memoryStatus && <Badge color={latestRun?.memoryStatus === "error" ? "red" : "green"}>{memoryStatus}</Badge>}
+      </Flex>
+      <Text as="p" size="1" color="gray">{copy.approvalHelp}</Text>
+      <Flex gap="2" wrap="wrap"><Button size="1" color="green" onClick={() => onVote("approve")}>{copy.approve}</Button><Button size="1" color="red" variant="soft" onClick={() => onVote("request_changes")}>{copy.requestChanges}</Button><Button size="1" variant="outline" onClick={onExport}>{copy.exportIssue}</Button></Flex>
+    </Card>
   </section>;
 }
 
@@ -809,6 +842,8 @@ function Welcome(props: {
   setApiKey: (value: string) => void;
   systemPrompt: string;
   setSystemPrompt: (value: string) => void;
+  memoryEnabled: boolean;
+  setMemoryEnabled: (value: boolean) => void;
   projectZip: File | null;
   setProjectZip: (value: File | null) => void;
   createSession: () => void;
@@ -876,6 +911,17 @@ function Welcome(props: {
               </Select.Root>
               <TextField.Root placeholder={props.copy.preferredModel} value={props.preferredModel} onChange={(event) => props.setPreferredModel(event.target.value)} />
               <TextField.Root type="password" placeholder={props.copy.apiKeyCreate} value={props.apiKey} onChange={(event) => props.setApiKey(event.target.value)} />
+              <label className="memory-toggle">
+                <input
+                  type="checkbox"
+                  checked={props.memoryEnabled}
+                  onChange={(event) => props.setMemoryEnabled(event.target.checked)}
+                />
+                <span>
+                  <strong>{props.copy.memoryLabel}</strong>
+                  <small>{props.copy.memoryHelp}</small>
+                </span>
+              </label>
               <Box className="field-group">
                 <label className="field-label" htmlFor="project-zip">{props.copy.startingZipLabel}</label>
                 <Text as="p" size="1" color="gray" mb="2">{props.copy.startingZipHelp}</Text>
@@ -924,6 +970,7 @@ function RoomSettingsDialog(props: {
   const [visibility, setVisibility] = useState(props.room.visibility);
   const [preferredModel, setPreferredModel] = useState(props.room.preferredModel || "");
   const [systemPrompt, setSystemPrompt] = useState(props.room.systemPrompt);
+  const [memoryEnabled, setMemoryEnabled] = useState(props.room.memoryEnabled);
   const [apiKey, setApiKey] = useState("");
 
   useEffect(() => {
@@ -932,6 +979,7 @@ function RoomSettingsDialog(props: {
     setVisibility(props.room.visibility);
     setPreferredModel(props.room.preferredModel || "");
     setSystemPrompt(props.room.systemPrompt);
+    setMemoryEnabled(props.room.memoryEnabled);
     setApiKey("");
   }, [
     props.open,
@@ -940,6 +988,7 @@ function RoomSettingsDialog(props: {
     props.room.visibility,
     props.room.preferredModel,
     props.room.systemPrompt,
+    props.room.memoryEnabled,
   ]);
 
   const save = async () => {
@@ -949,6 +998,7 @@ function RoomSettingsDialog(props: {
       visibility,
       preferredModel,
       systemPrompt,
+      memoryEnabled,
       ...(apiKey.trim() ? { apiKey, baseUrl: "https://api.tokenrouter.com/v1" } : {}),
     }, "PATCH"));
     const data = await response.json();
@@ -970,6 +1020,17 @@ function RoomSettingsDialog(props: {
         </Select.Root>
         <TextField.Root value={preferredModel} onChange={(event) => setPreferredModel(event.target.value)} placeholder="Preferred model or TokenRouter auto" />
         <TextField.Root type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={props.copy.newApiKey} />
+        <label className="memory-toggle">
+          <input
+            type="checkbox"
+            checked={memoryEnabled}
+            onChange={(event) => setMemoryEnabled(event.target.checked)}
+          />
+          <span>
+            <strong>{props.copy.memoryLabel}</strong>
+            <small>{props.copy.memoryHelp}</small>
+          </span>
+        </label>
         <Box className="field-group">
           <label className="field-label" htmlFor="settings-system-prompt">{props.copy.systemPromptLabel}</label>
           <Text as="p" size="1" color="gray" mb="2" id="settings-system-prompt-help">{props.copy.systemPromptHelp}</Text>

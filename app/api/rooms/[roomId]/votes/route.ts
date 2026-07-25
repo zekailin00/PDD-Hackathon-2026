@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { verifyIdentity } from "@/lib/server/auth";
-import { getRoom, recordVote } from "@/lib/server/rooms";
+import { getRoom, publishSnapshot, recordVote, updateRun } from "@/lib/server/rooms";
+import { rememberApprovedDecision } from "@/lib/server/memory";
 import { evaluateQuorum } from "@/pdd/approval-quorum";
 import { can, voters } from "@/pdd/role-policy";
 
@@ -20,6 +21,27 @@ export async function POST(request: Request, context: { params: Promise<{ roomId
     const room = getRoom(roomId)!;
     const electorate = voters(room.participants);
     const result = evaluateQuorum(electorate, room.votes.filter((vote) => vote.runId === parsed.data.runId));
+    const run = room.runs.find((item) => item.id === parsed.data.runId);
+    if (
+      result.canOpenPr
+      && room.memoryEnabled
+      && run
+      && run.memoryStatus !== "pending"
+      && run.memoryStatus !== "queued"
+    ) {
+      updateRun(roomId, run.id, { memoryStatus: "pending" });
+      publishSnapshot(room);
+      void rememberApprovedDecision({ room, runId: run.id })
+        .then(() => {
+          updateRun(roomId, run.id, { memoryStatus: "queued" });
+          publishSnapshot(room);
+        })
+        .catch((error: unknown) => {
+          updateRun(roomId, run.id, { memoryStatus: "error" });
+          publishSnapshot(room);
+          console.error(`Mem0 approved decision write failed (${error instanceof Error ? error.name : "UnknownError"}).`);
+        });
+    }
     return Response.json({ quorum: result });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "The vote failed." }, { status: 400 });

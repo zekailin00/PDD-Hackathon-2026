@@ -534,6 +534,39 @@ body {
 .radix-themes textarea::placeholder { color: var(--placeholder) !important; }
 
 .field-group { min-width: 0; }
+
+.memory-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: var(--border-thin);
+  border-radius: 8px;
+  background: var(--paper);
+  cursor: pointer;
+}
+
+.memory-toggle input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--teal);
+  cursor: pointer;
+}
+
+.memory-toggle span {
+  display: grid;
+  gap: 3px;
+}
+
+.memory-toggle strong {
+  color: var(--ink);
+}
+
+.memory-toggle small {
+  color: var(--ink-2);
+  line-height: 1.35;
+}
 .field-label {
   display: block;
   margin-bottom: 4px;

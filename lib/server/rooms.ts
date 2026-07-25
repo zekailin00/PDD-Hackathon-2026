@@ -97,6 +97,7 @@ function seedDemoRoom(): void {
     createdBy: "demo-owner",
     visibility: "public",
     systemPrompt: ROOM_AGENT_SYSTEM,
+    memoryEnabled: false,
     preferredModel: "",
     isDemo: true,
     state: "PROPOSED",
@@ -228,6 +229,7 @@ export function createRoom(input: {
   title?: string;
   visibility: RoomVisibility;
   systemPrompt?: string;
+  memoryEnabled?: boolean;
   preferredModel?: string;
   apiKey?: string;
   baseUrl?: string;
@@ -248,6 +250,7 @@ export function createRoom(input: {
     createdBy: input.participant.userId,
     visibility: input.visibility,
     systemPrompt: input.systemPrompt?.trim().slice(0, 20_000) || ROOM_AGENT_SYSTEM,
+    memoryEnabled: input.memoryEnabled ?? false,
     preferredModel: input.preferredModel?.trim().slice(0, 200) || "",
     sourceArchive: input.sourceArchive ? {
       name: input.sourceArchive.name,
@@ -312,6 +315,7 @@ export function updateRoomSettings(
     title?: string;
     visibility?: RoomVisibility;
     systemPrompt?: string;
+    memoryEnabled?: boolean;
     preferredModel?: string;
     apiKey?: string;
     baseUrl?: string;
@@ -323,6 +327,7 @@ export function updateRoomSettings(
   if (patch.title !== undefined) room.title = patch.title.trim().slice(0, 100) || room.title;
   if (patch.visibility !== undefined) room.visibility = patch.visibility;
   if (patch.systemPrompt !== undefined) room.systemPrompt = patch.systemPrompt.trim().slice(0, 20_000) || ROOM_AGENT_SYSTEM;
+  if (patch.memoryEnabled !== undefined) room.memoryEnabled = patch.memoryEnabled;
   if (patch.preferredModel !== undefined) room.preferredModel = patch.preferredModel.trim().slice(0, 200);
   const secret = store.secrets.get(room.id) ?? { inviteCode: inviteCode() };
   if (patch.apiKey !== undefined) secret.apiKey = patch.apiKey.trim() || undefined;

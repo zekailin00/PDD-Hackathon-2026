@@ -18,6 +18,7 @@ const schema = z.discriminatedUnion("operation", [
     title: z.string().max(100).optional(),
     visibility: z.enum(["public", "private"]).optional(),
     systemPrompt: z.string().max(20_000).optional(),
+    memoryEnabled: z.boolean().optional(),
     preferredModel: z.string().max(200).optional(),
     apiKey: z.string().max(500).optional(),
     baseUrl: z.string().url().max(500).optional().or(z.literal("")),

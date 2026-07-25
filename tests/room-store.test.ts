@@ -9,6 +9,7 @@ import {
   listPublicRooms,
   removeParticipant,
   setPresence,
+  updateRoomSettings,
 } from "@/lib/server/rooms";
 import { recentContext } from "@/lib/server/run-agent";
 
@@ -38,6 +39,23 @@ describe("production room boundaries", () => {
       participant: { userId: "guest", name: "Guest", role: "qa" },
     });
     expect(joined.participants.some((person) => person.userId === "guest")).toBe(true);
+  });
+
+  it("keeps long-term memory opt-in and creator-controlled", () => {
+    const created = createRoom({
+      title: "Memory settings",
+      visibility: "public",
+      participant: creator,
+    });
+    expect(created.room.memoryEnabled).toBe(false);
+
+    const updated = updateRoomSettings(created.room.id, creator.userId, {
+      memoryEnabled: true,
+    });
+    expect(updated.room.memoryEnabled).toBe(true);
+    expect(() => updateRoomSettings(created.room.id, "guest", {
+      memoryEnabled: false,
+    })).toThrow(/Only the room creator/);
   });
 
   it("never includes Member Chat in AI context", () => {

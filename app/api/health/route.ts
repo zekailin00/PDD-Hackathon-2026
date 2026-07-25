@@ -13,6 +13,7 @@ export async function GET() {
     runtime: "node",
     rooms: listPublicRooms().length,
     tokenRouterConfigured: Boolean(process.env.TOKENROUTER_API_KEY),
+    mem0Configured: Boolean(process.env.MEM0_API_KEY),
     githubConfigured: Boolean(
       process.env.GITHUB_TOKEN
       && githubOwner
