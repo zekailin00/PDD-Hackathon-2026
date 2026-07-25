@@ -190,10 +190,22 @@ function connect() {
 
 /* -------------------------------------------------------------- render --- */
 
+const PILL_LABEL = {
+  IDLE: "Quiet",
+  RUNNING: "Working",
+  AWAITING_INPUT: "Needs your answer",
+  PROPOSED: "Waiting on the room",
+};
+
 function setState(state) {
   S.state = state;
+
+  // The stylesheet keys the composer colour, the caret and the pill animation
+  // off this one attribute, so the whole shell shifts together.
+  $("app").dataset.state = state;
+
   const pill = $("state-pill");
-  pill.textContent = state;
+  pill.textContent = PILL_LABEL[state] || state;
   pill.className = "pill " + state.toLowerCase();
 
   const running = state === "RUNNING";
@@ -203,14 +215,23 @@ function setState(state) {
   if (S.roles) applyMyPowers();
 
   const hints = {
-    IDLE: "Room is idle — this starts the next run's prompt.",
-    RUNNING: "Run in progress — what you type queues as a steer and lands between steps.",
-    AWAITING_INPUT: "CoPrompt asked the room a question — your message answers it.",
-    PROPOSED: "A proposal is waiting on the room's approval.",
+    IDLE: "Room's quiet — this becomes the next thing we ask for.",
+    RUNNING: "It's working — whatever you type slips in between steps.",
+    AWAITING_INPUT: "CoPrompt asked the room something — your message is the answer.",
+    PROPOSED: "Changes are waiting for everyone's yes.",
   };
+  const placeholders = {
+    IDLE: "Say what you want built…",
+    RUNNING: "Nudge it while it works…",
+    AWAITING_INPUT: "Answer the room…",
+    PROPOSED: "Say what you want built…",
+  };
+  const buttons = { IDLE: "Send", RUNNING: "Nudge", AWAITING_INPUT: "Answer",
+                    PROPOSED: "Send" };
+
   $("composer-hint").textContent = hints[state] || "";
-  $("composer-input").placeholder =
-    running ? "Steer the run…" : state === "AWAITING_INPUT" ? "Answer the room…" : "Type to prompt…";
+  $("composer-input").placeholder = placeholders[state] || "Type…";
+  $("send-btn").textContent = buttons[state] || "Send";
 }
 
 function renderPeers() {
@@ -225,19 +246,33 @@ function renderPeers() {
 function addMessage(m) {
   const el = document.createElement("div");
   el.className = "msg " + m.kind;
-  if (m.kind === "system") {
-    el.innerHTML = `<div class="body">${escapeHtml(m.content)}</div>`;
-  } else {
-    const who = m.kind === "agent" || m.kind === "question" ? "CoPrompt" : m.author_name;
-    const tag = m.kind === "agent" || m.kind === "question"
-      ? "" : `<span class="role-tag">${ROLE_LABEL[m.role] || m.role}</span>`;
-    el.innerHTML =
-      `<div class="who">${escapeHtml(who)}${tag}</div>
-       <div class="body">${escapeHtml(m.content)}</div>`;
-  }
+
+  const fromAgent = m.kind === "agent" || m.kind === "question";
+  const who = fromAgent ? "CoPrompt" : m.author_name;
+  const color = fromAgent ? "#6b8afd" : peerColor(m.author_id, m.author_name);
+  const tag = fromAgent ? ""
+    : `<span class="role-tag">${ROLE_LABEL[m.role] || m.role || ""}</span>`;
+
+  el.innerHTML =
+    `<div class="msg-head">
+       <span class="dot" style="background:${color}">${initials(who)}</span>
+       <span class="who">${escapeHtml(who)}</span>${tag}
+     </div>
+     <div class="body">${escapeHtml(m.content)}</div>`;
+
   const chat = $("chat");
   chat.appendChild(el);
   chat.scrollTop = chat.scrollHeight;
+}
+
+/* Stable colour per person: the same teammate is the same colour everywhere --
+   presence chip, chat avatar, ledger row. */
+function peerColor(userId, name) {
+  const found = S.participants.find((p) => p.user_id === userId);
+  if (found) return found.color;
+  const seed = String(name || "?").split("")
+    .reduce((a, c) => a + c.charCodeAt(0), 0);
+  return ["#7aa2f7", "#e0af68", "#bb9af7", "#7fe0b0", "#ff9d9d", "#9fb4ff"][seed % 6];
 }
 
 function pushStep(text, cls = "") {
@@ -258,19 +293,27 @@ function flashSteer(text) {
 }
 
 function renderLedger(ledger) {
-  const names = Object.fromEntries(S.participants.map((p) => [p.user_id, p.name]));
   const rows = Object.entries(ledger || {});
   if (!rows.length) {
-    $("ledger-body").innerHTML = '<span class="muted">No runs yet.</span>';
+    $("ledger-body").innerHTML = '<span class="muted">Nothing spent yet.</span>';
     return;
   }
+  const names = Object.fromEntries(S.participants.map((p) => [p.user_id, p.name]));
   const total = rows.reduce((a, [, v]) => a + v, 0);
+
   $("ledger-body").innerHTML =
-    rows.sort((a, b) => b[1] - a[1]).map(([uid, tokens]) =>
-      `<div class="ledger-row"><span>${escapeHtml(names[uid] || uid)}</span>
-       <b>${tokens.toLocaleString()}</b></div>`).join("") +
-    `<div class="ledger-row" style="border-top:1px solid var(--line);margin-top:6px;padding-top:6px">
-       <span class="muted">total</span><b>${total.toLocaleString()}</b></div>`;
+    rows.sort((a, b) => b[1] - a[1]).map(([uid, tokens]) => {
+      const name = names[uid] || "left the room";
+      return `<div class="ledger-row">
+          <span style="display:flex;align-items:center;gap:9px;min-width:0">
+            <span class="dot" style="background:${peerColor(uid, name)}">${initials(name)}</span>
+            <span>${escapeHtml(name)}</span>
+          </span>
+          <b>${tokens.toLocaleString()}</b>
+        </div>`;
+    }).join("") +
+    `<div class="ledger-row total"><span>Total so far</span>
+       <b>${total.toLocaleString()}</b></div>`;
 }
 
 function renderProposal(p) {
@@ -290,9 +333,9 @@ function renderProposal(p) {
     ${diffs}
     <div id="votes" class="votes"></div>
     <div class="proposal-actions">
-      <button id="approve-btn" class="primary" ${merged ? "disabled" : ""}>✓ Approve</button>
-      <button id="reject-btn" class="ghost" ${merged ? "disabled" : ""}>✕ Request changes</button>
-      <button id="pr-btn" class="primary" disabled>Open PR</button>
+      <button id="approve-btn" ${merged ? "disabled" : ""}>Looks good</button>
+      <button id="reject-btn" ${merged ? "disabled" : ""}>Ask for changes</button>
+      <button id="pr-btn" disabled>Open the pull request</button>
     </div>
     ${p.pr_url ? `<a class="pr-link" href="${p.pr_url}" target="_blank" rel="noopener">→ ${escapeHtml(p.pr_url)}</a>` : ""}
   `;
@@ -305,21 +348,29 @@ function renderProposal(p) {
 
 function renderQuorum(q) {
   const names = Object.fromEntries(S.participants.map((p) => [p.user_id, p.name]));
-  const chip = (uid, cls, mark) =>
-    `<span class="vote-chip ${cls}">${mark} ${escapeHtml(names[uid] || uid)}</span>`;
+  const chip = (uid, cls, mark) => {
+    const name = names[uid] || uid;
+    return `<span class="vote-chip ${cls}">
+        <span class="dot">${mark}</span>${escapeHtml(name)}</span>`;
+  };
 
   const votes = $("votes");
   if (votes) {
     votes.innerHTML =
-      q.approved_by.map((u) => chip(u, "approved", "✓")).join("") +
-      q.blocked_by.map((u) => chip(u, "blocked", "✕")).join("") +
-      q.waiting_on.map((u) => chip(u, "waiting", "○")).join("");
+      q.approved_by.map((u) => chip(u, "approved", "\u2713")).join("") +
+      q.blocked_by.map((u) => chip(u, "blocked", "\u2715")).join("") +
+      q.waiting_on.map((u) => chip(u, "waiting", "\u25CB")).join("");
   }
   $("quorum-note").textContent = q.reason || "";
+
   const btn = $("pr-btn");
   if (btn) {
-    btn.disabled = !q.can_open_pr || S.proposal?.status === "merged";
-    btn.textContent = q.can_open_pr ? "🚀 Open PR" : "Open PR";
+    const mine = S.roles?.[S.me?.role];
+    const mayOpen = mine ? mine.open_pr : true;
+    btn.disabled = !q.can_open_pr || !mayOpen || S.proposal?.status === "merged";
+    btn.textContent = S.proposal?.status === "merged"
+      ? "Pull request opened"
+      : "Open the pull request";
   }
 }
 
@@ -360,9 +411,9 @@ const vote = (verdict) =>
 const openPr = async () => {
   const btn = $("pr-btn");
   btn.disabled = true;
-  btn.textContent = "opening…";
+  btn.textContent = "Opening…";
   const res = await post(`/api/rooms/${S.room}/proposals/${S.proposal.id}/pr`, {});
-  if (!res) { btn.disabled = false; btn.textContent = "🚀 Open PR"; }
+  if (!res) { btn.disabled = false; btn.textContent = "Open the pull request"; }
 };
 
 let intentTimer;

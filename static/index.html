@@ -3,133 +3,181 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>CoPrompt — one AI session, the whole team</title>
+  <title>CoPrompt — prompt one AI together</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
 
-<div id="gate" class="gate">
-  <div class="gate-card">
-    <h1>CoPrompt</h1>
-    <p class="tag">One AI session. The whole team. Nobody waits their turn.</p>
+<div class="page">
+  <div class="shell">
 
-    <label>Room
-      <input id="g-room" placeholder="otter-42" autocomplete="off">
-    </label>
-    <label>Your name
-      <input id="g-name" placeholder="Amy" autocomplete="off">
-    </label>
-    <label>Your role
-      <select id="g-role">
-        <option value="pm">PM — owns scope &amp; acceptance criteria</option>
-        <option value="eng" selected>ENG — owns implementation</option>
-        <option value="design">DESIGN — owns UX</option>
-        <option value="qa">QA — owns verification</option>
-        <option value="observer">OBSERVER — watches and suggests, no vote</option>
-      </select>
-    </label>
-    <button id="g-join" class="primary">Join room</button>
-    <p class="hint">No account. No password. Your role decides what the agent
-      defers to you on.</p>
-  </div>
-</div>
+    <div id="app" class="app" data-state="IDLE">
 
-<div id="app" class="app hidden">
-  <header class="bar">
-    <div class="brand">CoPrompt<span class="room-id" id="room-label"></span></div>
-    <div id="peers" class="peers"></div>
-    <div class="bar-right">
-      <span id="state-pill" class="pill idle">IDLE</span>
-      <button id="roles-btn" class="ghost">Roles</button>
-      <button id="key-btn" class="ghost">Add my API key</button>
-    </div>
-  </header>
+      <header class="bar">
+        <div class="brand">
+          <div class="mark"><span></span><span></span></div>
+          <div class="brand-name">CoPrompt</div>
+        </div>
+        <div id="room-label" class="room-id"></div>
+        <div id="peers" class="peers"></div>
+        <div class="bar-right">
+          <span id="state-pill" class="pill idle">Quiet</span>
+          <button id="roles-btn" class="ghost">Who can do what</button>
+          <button id="key-btn" class="ghost">+ Add key</button>
+        </div>
+      </header>
 
-  <main class="grid">
-    <section class="pane intent-pane">
-      <div class="pane-head">
-        <h2>Shared Intent</h2>
-        <span id="lock-note" class="lock-note"></span>
-      </div>
-      <textarea id="intent" placeholder="## Goal
-One sentence describing the user-visible outcome.
+      <main class="grid">
+
+        <section class="pane intent-pane">
+          <div class="pane-head">
+            <h2>What we're asking for</h2>
+            <span class="muted">everyone edits</span>
+          </div>
+          <textarea id="intent" spellcheck="false" placeholder="## Goal
+One sentence describing what someone will be able to do.
 
 ## Acceptance criteria
 1. Given ..., when ..., then ...
 
 ## Must not
 - Must not ..."></textarea>
-      <div class="intent-actions">
-        <button id="run-btn" class="primary">▶ Run</button>
-        <button id="halt-btn" class="danger hidden">■ Halt</button>
-      </div>
-      <div class="ledger">
-        <h3>Usage this room</h3>
-        <div id="ledger-body" class="ledger-body">
-          <span class="muted">No runs yet.</span>
+          <div id="lock-note" class="lock-note"></div>
+          <div class="intent-actions">
+            <button id="run-btn" class="primary">Start run</button>
+            <button id="halt-btn" class="danger hidden">Stop run</button>
+          </div>
+          <div class="ledger">
+            <div class="ledger-head">
+              <h3>Who's paying</h3>
+              <span class="muted">split by your own key</span>
+            </div>
+            <div id="ledger-body" class="ledger-body">
+              <span class="muted">Nothing spent yet.</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="pane run-pane">
+          <div class="pane-head">
+            <h2>What it's doing</h2>
+            <span id="provider-note" class="muted"></span>
+          </div>
+          <div id="steps" class="steps"></div>
+          <pre id="stream" class="stream"></pre>
+          <div id="steer-flash" class="steer-flash hidden"></div>
+        </section>
+
+        <section class="pane proposal-pane">
+          <div class="pane-head">
+            <h2>What it wants to change</h2>
+            <span class="muted">CoPrompt can't push code — the room decides</span>
+          </div>
+          <div id="proposal" class="proposal">
+            <div class="empty">Nothing yet. When a run finishes, the changes it
+              suggests show up here for everyone to vote on.</div>
+          </div>
+          <div id="quorum-note" class="quorum-note"></div>
+        </section>
+
+        <section class="pane chat-pane">
+          <div class="pane-head">
+            <h2>The room</h2>
+            <span class="muted">everyone prompts the same session</span>
+          </div>
+          <div id="chat" class="chat"></div>
+          <div class="composer-wrap">
+            <div class="composer">
+              <input id="composer-input" placeholder="Say what you want built…"
+                     autocomplete="off">
+              <button id="send-btn">Send</button>
+            </div>
+            <div id="composer-hint" class="composer-hint">Room's quiet — this
+              becomes the next thing we ask for.</div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <div id="gate" class="gate">
+      <div class="gate-card">
+        <div class="gate-brand">
+          <div class="mark"><span></span><span></span></div>
+          <h1>CoPrompt</h1>
+        </div>
+        <p class="tag">Prompt one AI together. Everyone in the same window, at
+          the same time.</p>
+
+        <label for="g-room">Room</label>
+        <input id="g-room" placeholder="otter-42" autocomplete="off">
+
+        <label for="g-name">Your name</label>
+        <input id="g-name" placeholder="Amy" autocomplete="off">
+
+        <label for="g-role">What you do</label>
+        <select id="g-role">
+          <option value="pm">PM — owns scope and acceptance criteria</option>
+          <option value="eng" selected>ENG — owns how it gets built</option>
+          <option value="design">DESIGN — owns how it looks and feels</option>
+          <option value="qa">QA — owns whether it's done</option>
+          <option value="observer">OBSERVER — watches and suggests, no vote</option>
+        </select>
+
+        <button id="g-join">Join the room</button>
+
+        <div class="gate-foot">
+          <div class="stack">
+            <span class="dot" style="background:#7aa2f7">AM</span>
+            <span class="dot" style="background:#e0af68">JO</span>
+            <span class="dot" style="background:#bb9af7">KA</span>
+          </div>
+          <p>No account, no password — your role decides what the agent defers
+            to you on.</p>
         </div>
       </div>
-    </section>
-
-    <section class="pane run-pane">
-      <div class="pane-head"><h2>Live run</h2><span id="provider-note" class="muted"></span></div>
-      <div id="steps" class="steps"></div>
-      <pre id="stream" class="stream"></pre>
-      <div id="steer-flash" class="steer-flash hidden"></div>
-    </section>
-
-    <section class="pane chat-pane">
-      <div class="pane-head"><h2>Room</h2></div>
-      <div id="chat" class="chat"></div>
-      <div class="composer">
-        <input id="composer-input" placeholder="Type to prompt…" autocomplete="off">
-        <button id="send-btn" class="primary">Send</button>
-      </div>
-      <p id="composer-hint" class="hint">Room is idle — this starts the next run's prompt.</p>
-    </section>
-
-    <section class="pane proposal-pane">
-      <div class="pane-head"><h2>Proposal</h2><span id="quorum-note" class="muted"></span></div>
-      <div id="proposal" class="proposal">
-        <span class="muted">The agent is read-only. When it proposes a change,
-          it appears here and needs everyone's approval before it can become a PR.</span>
-      </div>
-    </section>
-  </main>
-</div>
-
-<div id="roles-modal" class="modal hidden">
-  <div class="modal-card wide">
-    <h2>Role powers</h2>
-    <p class="hint">What each role may do in this room. Roles without a vote are
-      never waited on by the approval gate. Enforced on the server, not by
-      hiding buttons.</p>
-    <div id="roles-grid" class="roles-grid"></div>
-    <div class="modal-actions">
-      <button id="r-save" class="primary">Save</button>
-      <button id="r-cancel" class="ghost">Cancel</button>
     </div>
-    <p id="r-status" class="hint"></p>
-  </div>
-</div>
 
-<div id="key-modal" class="modal hidden">
-  <div class="modal-card">
-    <h2>Bring your own key</h2>
-    <p class="hint">Held in the server's memory for this session only. Never
-      written to disk, never logged, never sent anywhere except the provider
-      it belongs to. Usage is split back to you by contribution.</p>
-    <label>Provider
-      <select id="k-provider"></select>
-    </label>
-    <label>API key
-      <input id="k-key" type="password" placeholder="sk-ant-… / tr-…" autocomplete="off">
-    </label>
-    <div class="modal-actions">
-      <button id="k-save" class="primary">Load key</button>
-      <button id="k-cancel" class="ghost">Cancel</button>
+    <div id="roles-modal" class="modal hidden">
+      <div class="modal-card wide">
+        <h2>Who can do what</h2>
+        <p class="hint">Roles without a vote are never waited on by the approval
+          gate, so an observer can't stall a proposal. Enforced on the server —
+          not by hiding buttons.</p>
+        <div id="roles-grid" class="roles-grid"></div>
+        <div class="modal-actions">
+          <button id="r-save" class="primary">Save</button>
+          <button id="r-cancel" class="ghost">Cancel</button>
+        </div>
+        <p id="r-status" class="hint"></p>
+      </div>
     </div>
-    <p id="k-status" class="hint"></p>
+
+    <div id="key-modal" class="modal hidden">
+      <div class="modal-card">
+        <h2>Add your own key</h2>
+        <p class="hint">You pay for what you prompt. The room sees your share of
+          the tokens, never your key.</p>
+
+        <label for="k-provider">Provider</label>
+        <select id="k-provider"></select>
+
+        <label for="k-key">API key</label>
+        <input id="k-key" type="password" placeholder="sk-ant-… / tr-…"
+               autocomplete="off">
+
+        <div class="note">Held in the server's memory for this session only.
+          Never written to disk, never logged, and never sent anywhere except
+          the provider it belongs to.</div>
+
+        <div class="modal-actions">
+          <button id="k-save" class="primary">Save key</button>
+          <button id="k-cancel" class="ghost">Cancel</button>
+        </div>
+        <p id="k-status" class="hint"></p>
+      </div>
+    </div>
+
   </div>
 </div>
 

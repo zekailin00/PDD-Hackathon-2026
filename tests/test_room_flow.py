@@ -15,19 +15,23 @@ client = TestClient(app)
 
 ROOM = "test-room"
 
-# The approval-gate tests exercise pdd/approval_quorum.py. Before anyone has
-# run scripts/pdd-sync.sh that artifact does not exist yet, so they skip
-# rather than fail -- a missing artifact is a "not generated yet" state, not a
-# broken build.
+# Most of the room's behaviour routes through the PDD-owned modules: role_policy
+# decides who may act, approval_quorum decides whether a proposal ships. Before
+# anyone has run scripts/pdd-sync.sh those artifacts do not exist, so these
+# tests skip rather than fail -- a missing artifact is a "not generated yet"
+# state, not a broken build.
 try:
     import pdd.approval_quorum  # noqa: F401
-    _HAS_QUORUM = True
+    import pdd.role_policy      # noqa: F401
+    _HAS_PDD = True
 except ImportError:
-    _HAS_QUORUM = False
+    _HAS_PDD = False
+
+_HAS_QUORUM = _HAS_PDD          # kept for the existing markers below
 
 needs_quorum = pytest.mark.skipif(
-    not _HAS_QUORUM,
-    reason="pdd/approval_quorum.py not generated yet -- run scripts/pdd-sync.sh",
+    not _HAS_PDD,
+    reason="pdd modules not generated yet -- run scripts/pdd-sync.sh",
 )
 
 
@@ -87,6 +91,7 @@ def test_message_is_a_prompt_when_idle():
     assert r.json()["queued_as"] == "prompt"
 
 
+@needs_quorum
 def test_message_becomes_a_steer_while_running():
     uid = join("Amy", "eng")
     room = state.ROOMS[ROOM]
@@ -110,6 +115,7 @@ def test_message_becomes_an_answer_while_awaiting_input():
     assert r.json()["queued_as"] == "answer"
 
 
+@needs_quorum
 def test_running_room_rejects_a_second_run():
     uid = join("Amy", "eng")
     room = state.ROOMS[ROOM]
@@ -121,6 +127,7 @@ def test_running_room_rejects_a_second_run():
     assert r.status_code == 409, "two people hitting Run must not start two runs"
 
 
+@needs_quorum
 def test_run_without_any_key_is_refused():
     uid = join("Amy", "eng")
     assert not keys.has_fallback(), "this test assumes no house key in the env"
@@ -226,6 +233,7 @@ def test_gate_is_enforced_server_side_not_in_the_browser():
     assert r.status_code == 409
 
 
+@needs_quorum
 def test_invalid_verdict_is_rejected():
     amy = join("Amy", "eng")
     room = state.ROOMS[ROOM]
@@ -272,6 +280,7 @@ def test_empty_key_is_rejected():
 # contribution weights feed the token split
 # --------------------------------------------------------------------------
 
+@needs_quorum
 def test_contributions_are_ordered_with_the_initiator_first():
     amy, joe = join("Amy", "eng"), join("Joe", "qa")
     room = state.ROOMS[ROOM]
