@@ -84,12 +84,22 @@ export function recentContext(room: Room): string {
 
 function saveArtifacts(roomId: string, runId: string, output: string): void {
   const pattern = /<artifact\s+kind="(html|tests|criteria)">([\s\S]*?)<\/artifact>/gi;
+  let hasHtml = false;
   for (const match of output.matchAll(pattern)) {
     const kind = match[1].toLowerCase() as "html" | "tests" | "criteria";
     const content = kind === "html"
       ? match[2].trim().replace(/^```(?:html)?\s*/i, "").replace(/\s*```$/, "")
       : match[2].trim();
-    if (content) addArtifact(roomId, { runId, kind, content });
+    if (content) {
+      if (kind === "html") hasHtml = true;
+      addArtifact(roomId, { runId, kind, content });
+    }
+  }
+  // System Prompt 仍要求唯一 artifact 格式；這只在模型漏掉 wrapper
+  // 但確實回傳完整 HTML 文件時恢復預覽，不建立第二種正式輸出格式。
+  if (!hasHtml) {
+    const document = output.match(/(?:<!doctype html>|<html\b)[\s\S]*?<\/html>/i)?.[0];
+    if (document) addArtifact(roomId, { runId, kind: "html", content: document });
   }
 }
 

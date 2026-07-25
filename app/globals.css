@@ -151,6 +151,12 @@ body {
 .intent-panel   { border-right: var(--border); background: var(--cream-2); }
 .run-panel      { border-right: var(--border); background: var(--paper); }
 .artifact-panel { background: var(--cream-2); }
+.artifact-panel > .rt-TabsRoot {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 
 /* Section eyebrows read like machine labels. */
 .intent-panel .rt-Text[data-accent-color="gray"],
@@ -576,14 +582,16 @@ body {
 /* ------------------------------------------------------------- artifact -- */
 
 .artifact-body {
-  height: min(44vh, 480px);
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   border: var(--border);
   border-radius: 0 8px 8px 8px;
   background: var(--paper);
   box-shadow: var(--shadow);
 }
-.artifact-body iframe { width: 100%; height: min(44vh, 480px); border: 0; background: #fff; }
+.artifact-body .rt-TabsContent { height: 100%; }
+.artifact-body iframe { width: 100%; height: 100%; border: 0; background: #fff; }
 
 .empty {
   display: grid;
