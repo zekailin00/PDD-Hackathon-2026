@@ -1,0 +1,11 @@
+% path_sandbox — keep agent paths inside the repository
+
+# Module: path-sandbox
+
+Create pure path-decision helpers `resolveSandboxPath` and `isInsideSandbox`.
+Reject traversal outside root, outside absolute paths, prefix lookalikes, null
+bytes, home syntax, and symlinks whose existing ancestor lands outside root.
+Accept normalized and not-yet-created paths that remain inside. Resolve the
+longest existing ancestor so `escape/new-file` cannot bypass a symlink check.
+Return a canonical absolute path. Only filesystem metadata needed for path
+resolution may be read; never open file contents.

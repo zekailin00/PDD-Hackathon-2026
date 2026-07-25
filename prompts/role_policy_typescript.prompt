@@ -1,0 +1,11 @@
+% role_policy — define what each human lane may do
+
+# Module: role-policy
+
+Create pure TypeScript policy helpers for roles PM, ENG, DESIGN, QA, observer and
+powers run, steer, halt, edit_intent, vote, open_pr. Defaults:
+PM all true priority 80; ENG all true priority 70; QA cannot edit intent priority
+60; DESIGN cannot halt/open PR priority 50; observer can only steer priority 10.
+Unknown roles fail closed as observer. Partial overrides merge per power; unknown
+override keys are ignored. `voters` returns unique sorted IDs. Unknown powers
+throw. Do not mutate input or perform I/O.
