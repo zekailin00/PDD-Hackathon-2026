@@ -559,7 +559,7 @@ export default function Home() {
           <Badge color={room.state === "RUNNING" ? "amber" : room.state === "PROPOSED" ? "violet" : "green"}>{room.state}</Badge>
           <Text size="2">{room.title}</Text>
         </Flex>
-        <Flex justify="end" align="center" gap="2">
+        <Flex className="topbar-actions" justify="end" align="center">
           {room.participants.slice(0, 5).map((person) => <Box key={person.userId} className="presence-avatar">
             <Avatar fallback={person.name.slice(0, 2).toUpperCase()} color={roleColor[person.role]} size="2" title={`${person.name} · ${person.role} · ${person.status}`} />
             <span style={{ background: presenceColor[person.status] }} />
