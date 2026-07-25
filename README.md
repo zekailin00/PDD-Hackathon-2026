@@ -114,11 +114,13 @@ degrades without them**:
 Run it:
 
 ```bash
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Open <http://localhost:8000>, pick a room name and a role. Share the `/r/<room>`
-URL and everyone lands in the same session.
+Open <http://localhost:8000>, pick a room name and a role. To share the room
+with teammates on the same LAN, use your computer's LAN address instead (for
+example, `http://10.10.10.82:8000/r/<room>`). Everyone lands in the same
+session.
 
 ### Environment
 
