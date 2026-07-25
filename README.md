@@ -131,9 +131,18 @@ session.
 | `GITHUB_BASE_BRANCH` | no | Defaults to `main` |
 | `MEM0_API_KEY` | no | Cross-run room memory; falls back in-process |
 | `REPO_ROOT` | no | Codebase the agent may read; defaults to this repo |
+| `FALLBACK_API_KEY` | no | House key, so a visitor can try a room without bringing one |
+| `FALLBACK_PROVIDER` | no | Provider for the house key; defaults to `tokenrouter` |
+| `SEED_ROOMS` | no | `0` disables the worked example in new rooms |
+| `ALLOW_DEMO_SEED` | no | `1` enables the rehearsal proposal endpoint |
 
-Model API keys are **not** configured here. Each participant supplies their own
-in the UI.
+Participants normally supply their own model API key in the UI. If
+`FALLBACK_API_KEY` is set, a room that nobody has brought a key to falls back to
+it, so the product is usable on arrival — a participant's own key always wins
+over the house key.
+
+**Never put a key in a file in this repository.** It is public; set keys in the
+deployment platform's environment settings.
 
 ### Test
 

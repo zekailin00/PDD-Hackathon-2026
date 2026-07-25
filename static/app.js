@@ -99,7 +99,8 @@ function connect() {
 
   es.addEventListener("provider", (e) => {
     const d = JSON.parse(e.data);
-    $("provider-note").textContent = `${d.provider} · ${d.model}`;
+    $("provider-note").textContent =
+      `${d.provider} · ${d.model}` + (d.shared ? " · shared demo key" : "");
   });
 
   es.addEventListener("step", (e) => {

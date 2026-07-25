@@ -282,6 +282,7 @@ async def run_agent(room: state.Room, run_id: str, model: str | None = None) -> 
         "run_id": run_id,
         "provider": providers.resolve(provider)["label"],
         "model": model,
+        "shared": entry.get("shared", False),
     })
 
     messages = build_messages(room, run_id)

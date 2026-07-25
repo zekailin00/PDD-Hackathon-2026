@@ -123,8 +123,45 @@ def test_running_room_rejects_a_second_run():
 
 def test_run_without_any_key_is_refused():
     uid = join("Amy", "eng")
+    assert not keys.has_fallback(), "this test assumes no house key in the env"
     r = client.post(f"/api/rooms/{ROOM}/run", json={"user_id": uid})
     assert r.status_code == 400
+
+
+# --------------------------------------------------------------------------
+# the house key -- lets a visitor try the product without an account, and is
+# held to exactly the same secrecy rules as a participant's own key
+# --------------------------------------------------------------------------
+
+def test_house_key_is_used_when_nobody_brought_one(monkeypatch):
+    monkeypatch.setattr(keys, "FALLBACK_KEY", "sk-house-fallback-key-value")
+    monkeypatch.setattr(keys, "FALLBACK_PROVIDER", "tokenrouter")
+    entry = keys.pick_billing_key(ROOM, None)
+    assert entry["shared"] is True
+    assert entry["provider"] == "tokenrouter"
+
+
+def test_a_participants_own_key_wins_over_the_house_key(monkeypatch):
+    monkeypatch.setattr(keys, "FALLBACK_KEY", "sk-house-fallback-key-value")
+    uid = join("Amy", "eng")
+    keys.put(ROOM, uid, "sk-ant-amys-own-key")
+    entry = keys.pick_billing_key(ROOM, uid)
+    assert entry["shared"] is False
+    assert entry["key"] == "sk-ant-amys-own-key"
+
+
+def test_house_key_never_appears_in_any_client_payload(monkeypatch):
+    secret = "sk-house-do-not-leak-this-anywhere"
+    monkeypatch.setattr(keys, "FALLBACK_KEY", secret)
+    join("Amy", "eng")
+
+    for path in (f"/api/rooms/{ROOM}", "/api/health", "/api/providers"):
+        assert secret not in client.get(path).text, f"house key leaked via {path}"
+
+
+def test_health_reports_only_that_a_house_key_exists(monkeypatch):
+    monkeypatch.setattr(keys, "FALLBACK_KEY", "sk-house-fallback-key-value")
+    assert client.get("/api/health").json()["fallback_key"] == "configured"
 
 
 # --------------------------------------------------------------------------

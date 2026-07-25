@@ -224,7 +224,7 @@ async def start_run(room_id: str, body: dict = Body(...)):
         raise HTTPException(409, f"Room is {room.state}"
                                  + (f" -- {who.name} started a run" if who else ""))
 
-    if not keys.holders(room_id):
+    if not keys.holders(room_id) and not keys.has_fallback():
         raise HTTPException(400, "No API key loaded in this room. "
                                  "Each participant brings their own.")
 
@@ -379,6 +379,7 @@ async def health():
         "github_configured": bool(os.environ.get("GITHUB_TOKEN")
                                   and os.environ.get("GITHUB_REPO")),
         "memory_backend": "mem0" if memory.enabled() else "in-process",
+        "fallback_key": "configured" if keys.has_fallback() else "none",
         "providers": [p["id"] for p in providers.public_catalog()],
     }
 
