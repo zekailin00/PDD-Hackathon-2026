@@ -9,7 +9,14 @@ import type { Difficulty } from "@/pdd/model-router";
 import type { Role } from "@/pdd/role-policy";
 
 const identityKey = "coprompt:identity";
-const newId = () => crypto.randomUUID();
+const tokenRouterKey = "coprompt:tokenrouter-key";
+const newId = () => {
+  if (typeof globalThis.crypto?.randomUUID === "function") return globalThis.crypto.randomUUID();
+  if (typeof globalThis.crypto?.getRandomValues !== "function") return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const bytes = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+};
 const roleColor: Record<Role, "indigo" | "orange" | "pink" | "green" | "gray"> = {
   pm: "indigo", eng: "orange", design: "pink", qa: "green", observer: "gray",
 };
@@ -20,6 +27,8 @@ export default function Home() {
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
   const [token, setToken] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [apiKeyDraft, setApiKeyDraft] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState<Role>("pm");
   const [title, setTitle] = useState("Collaborative product room");
@@ -41,6 +50,8 @@ export default function Home() {
       const parsed = JSON.parse(stored) as Identity;
       setName(parsed.name); setRole(parsed.role);
     }
+    const storedKey = localStorage.getItem(tokenRouterKey) || "";
+    setApiKey(storedKey); setApiKeyDraft(storedKey);
     setRoomCode(new URLSearchParams(window.location.search).get("room") || "");
   }, []);
 
@@ -100,7 +111,8 @@ export default function Home() {
     if (!room || !prompt.trim()) return;
     setBusy(true); setLiveOutput(""); setNotice("正在啟動 TokenRouter auto…");
     try {
-      const response = await fetch("/api/agent", authorized({ roomId: room.id, prompt, difficulty }));
+      if (!apiKey) { setNotice("Add a TokenRouter API key before running the agent."); return; }
+      const response = await fetch("/api/agent", authorized({ roomId: room.id, prompt, difficulty, apiKey }));
       const data = await response.text();
       if (!response.ok) {
         const parsed = JSON.parse(data);
@@ -147,6 +159,12 @@ export default function Home() {
     if (response.ok) window.open(data.url, "_blank", "noopener,noreferrer");
     else setNotice(data.error);
   };
+  const saveApiKey = () => {
+    const value = apiKeyDraft.trim();
+    if (!value) return setNotice("Enter a TokenRouter API key first.");
+    localStorage.setItem(tokenRouterKey, value);
+    setApiKey(value); setNotice("TokenRouter key saved in this browser only.");
+  };
 
   return <Theme appearance="dark" accentColor="indigo" grayColor="slate" radius="large">
     {!room || !identity ? <Welcome {...{ name, setName, role, setRole, title, setTitle, roomCode, setRoomCode, join, notice }} /> :
@@ -171,7 +189,7 @@ export default function Home() {
             <Flex justify="between" align="center"><Box><Text size="1" color="gray" weight="bold">SHARED AGENT</Text><Heading size="4">即時執行</Heading></Box><Badge color="cyan">TokenRouter auto</Badge></Flex>
             {notice && <Card className="notice"><Text size="2">{notice}</Text></Card>}
             <Box className="stream-output"><pre>{liveOutput || latestOutput(room) || "共同意圖準備好後，任何有權限的角色都能啟動 agent。"}</pre></Box>
-            {room.state === "RUNNING" ? <Card className="steer-box">
+            {!apiKey ? <Card className="run-box"><Text size="2" weight="bold">Connect TokenRouter</Text><Text size="1" color="gray">Your key stays in this browser and is sent only when you run the agent.</Text><TextField.Root type="password" value={apiKeyDraft} onChange={(event) => setApiKeyDraft(event.target.value)} placeholder="tr_..." /><Button size="2" onClick={saveApiKey} disabled={!apiKeyDraft.trim()}>Save API key</Button></Card> : room.state === "RUNNING" ? <Card className="steer-box">
               <Text size="2" weight="bold">Steering Queue</Text>
               <TextArea value={steer} onChange={(event) => setSteer(event.target.value)} placeholder="下一個步驟前要修正什麼？" />
               <Flex gap="2"><Button size="2" onClick={() => sendSteer("nudge")} disabled={!steer.trim()}>⚡ Nudge</Button><Button size="2" color="red" variant="soft" onClick={() => sendSteer("halt")}>Halt</Button></Flex>

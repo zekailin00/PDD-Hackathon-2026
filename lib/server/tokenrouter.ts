@@ -2,8 +2,8 @@ import { chooseModel, type CatalogModel, type Difficulty, type ModelChoice } fro
 
 const DEFAULT_BASE_URL = "https://api.tokenrouter.com/v1";
 
-function config() {
-  const apiKey = process.env.TOKENROUTER_API_KEY;
+function config(apiKeyOverride?: string) {
+  const apiKey = apiKeyOverride || process.env.TOKENROUTER_API_KEY;
   if (!apiKey) throw new Error("伺服器尚未設定 TOKENROUTER_API_KEY。");
   return {
     apiKey,
@@ -11,8 +11,8 @@ function config() {
   };
 }
 
-export async function autoRoute(difficulty: Difficulty, prefer?: string): Promise<ModelChoice> {
-  const { apiKey, baseUrl } = config();
+export async function autoRoute(difficulty: Difficulty, prefer?: string, apiKeyOverride?: string): Promise<ModelChoice> {
+  const { apiKey, baseUrl } = config(apiKeyOverride);
   const response = await fetch(`${baseUrl}/models`, {
     headers: { Authorization: `Bearer ${apiKey}` },
     cache: "no-store",
@@ -28,10 +28,11 @@ export type ChatMessage = { role: "system" | "user" | "assistant"; content: stri
 export async function streamChat(input: {
   model: string;
   messages: ChatMessage[];
+  apiKey?: string;
   signal?: AbortSignal;
   onToken: (token: string) => void | Promise<void>;
 }): Promise<string> {
-  const { apiKey, baseUrl } = config();
+  const { apiKey, baseUrl } = config(input.apiKey);
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },

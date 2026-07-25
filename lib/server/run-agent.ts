@@ -41,6 +41,7 @@ export async function executeRoomAgent(input: {
   prompt: string;
   difficulty: Difficulty;
   prefer?: string;
+  apiKey?: string;
 }): Promise<string> {
   if (!can(input.identity.role, "run")) throw new Error("你的角色不能啟動 agent。");
   let room = getRoom(input.roomId);
@@ -56,7 +57,7 @@ export async function executeRoomAgent(input: {
     runId: run.id,
   });
   try {
-    const choice = await autoRoute(input.difficulty, input.prefer);
+    const choice = await autoRoute(input.difficulty, input.prefer, input.apiKey);
     updateRun(input.roomId, run.id, { model: choice.model });
     publish(input.roomId, { type: "step", runId: run.id, step: 0, label: `TokenRouter auto → ${choice.model}` });
 
@@ -90,6 +91,7 @@ export async function executeRoomAgent(input: {
       const phaseOutput = await streamChat({
         model: choice.model,
         messages,
+        apiKey: input.apiKey,
         onToken(token) {
           complete += token;
           updateRun(input.roomId, run.id, { output: complete });
