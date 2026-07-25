@@ -1,0 +1,99 @@
+% token_split — charge one agent run back to the participants who steered it
+
+# Module: token_split
+
+## Intent
+
+In CoPrompt, several people share a single AI session. Each person brings their
+own API key. When a run finishes we know the total tokens it consumed, and we
+know which participants contributed prompts or steers to that run. This module
+decides how many tokens each participant's key is charged.
+
+This is pure arithmetic. No I/O, no network, no logging, no global state.
+
+## Interface
+
+```python
+def split_tokens(
+    total_tokens: int,
+    contributions: list[dict],
+    mode: str = "weighted",
+) -> dict[str, int]:
+    ...
+```
+
+- `total_tokens` — tokens consumed by the whole run (input + output).
+- `contributions` — ordered list of `{"user_id": str, "weight": float}`.
+  `contributions[0]` is the participant who started the run.
+  `weight` is that participant's share of the steering effort for this run.
+- `mode` — one of:
+  - `"weighted"` — split in proportion to `weight`
+  - `"equal"` — ignore weights, divide evenly among participants
+  - `"initiator"` — charge the entire run to `contributions[0]`
+- Returns `{user_id: tokens_charged}`.
+
+## MUST
+
+- MUST return one entry for every distinct `user_id` in `contributions`.
+- MUST return only non-negative integers.
+- MUST conserve the total: `sum(result.values()) == total_tokens` exactly, for
+  every mode and every combination of weights. Integer division alone does not
+  satisfy this -- 100 tokens split three ways is 34/33/33, never 33/33/33.
+- MUST distribute the rounding remainder deterministically: give each
+  participant their floored share, then hand out the remaining tokens one at a
+  time, in descending order of the fractional part that was dropped, breaking
+  ties by `user_id` ascending. The result MUST NOT depend on dict iteration
+  order or on the order of `contributions`.
+- MUST treat a repeated `user_id` by summing that user's weights before
+  splitting, and MUST emit a single entry for that user.
+- MUST raise `ValueError` when `total_tokens` is negative.
+- MUST raise `ValueError` when `mode` is not one of the three listed values.
+
+## MUST NOT
+
+- MUST NOT mutate `contributions` or any dict inside it.
+- MUST NOT raise on an empty `contributions` list; return `{}` instead.
+- MUST NOT raise when every weight is zero; fall back to an even split.
+- MUST NOT perform any I/O.
+
+## Examples
+
+```python
+split_tokens(90, [{"user_id": "amy", "weight": 2.0},
+                  {"user_id": "joe", "weight": 1.0}])
+# -> {"amy": 60, "joe": 30}
+
+# Remainder handling. Floored shares are 33/33/33 and leave 1 token over;
+# all three dropped the same fraction, so the tie breaks on user_id.
+split_tokens(100, [{"user_id": "amy", "weight": 1.0},
+                   {"user_id": "joe", "weight": 1.0},
+                   {"user_id": "kai", "weight": 1.0}])
+# -> {"amy": 34, "joe": 33, "kai": 33}   (sums to 100, not 99)
+
+# Floored shares are 555/333/111 and leave 1 token over. The largest dropped
+# fraction is joe's (.33) -- larger than amy's (.55 -> .5 exactly? no: .5555
+# floors to 555 dropping .5555) -- compare dropped fractions, not weights.
+split_tokens(1000, [{"user_id": "amy", "weight": 5.0},
+                    {"user_id": "joe", "weight": 3.0},
+                    {"user_id": "kai", "weight": 1.0}])
+# -> sums to exactly 1000
+
+split_tokens(50, [{"user_id": "amy", "weight": 3.0},
+                  {"user_id": "joe", "weight": 1.0}], mode="equal")
+# -> {"amy": 25, "joe": 25}
+
+split_tokens(50, [{"user_id": "amy", "weight": 1.0},
+                  {"user_id": "joe", "weight": 1.0}], mode="initiator")
+# -> {"amy": 50, "joe": 0}
+
+split_tokens(0, [{"user_id": "amy", "weight": 1.0}])
+# -> {"amy": 0}
+
+split_tokens(100, [])
+# -> {}
+```
+
+## Done when
+
+- Every example above returns exactly the stated result.
+- The module has no imports beyond the standard library.

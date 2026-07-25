@@ -1,0 +1,29 @@
+# Render deployment.
+#
+# A run holds an SSE connection open for minutes while the agent works, so we
+# need a persistent process rather than a serverless function that would cut
+# the stream off mid-answer.
+#
+# Room state is in-process, so keep this at a single instance: two instances
+# would put participants of the same room on different servers and they would
+# not see each other. Lifting that is the first thing on the limitations list.
+
+services:
+  - type: web
+    name: coprompt
+    runtime: python
+    plan: starter
+    numInstances: 1
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      # Set in the Render dashboard, not here.
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GITHUB_REPO
+        sync: false
+      - key: MEM0_API_KEY
+        sync: false
