@@ -19,8 +19,10 @@ export async function POST(request: Request, context: { params: Promise<{ roomId
     if (!quorum.canOpenPr) return Response.json({ error: quorum.reason, quorum }, { status: 409 });
 
     const token = process.env.GITHUB_TOKEN;
-    const owner = process.env.GITHUB_OWNER;
-    const repo = process.env.GITHUB_REPO;
+    const configuredRepo = process.env.GITHUB_REPO || "";
+    const [legacyOwner, legacyRepo] = configuredRepo.split("/", 2);
+    const owner = process.env.GITHUB_OWNER || legacyOwner;
+    const repo = legacyRepo || configuredRepo;
     if (!token || !owner || !repo) {
       return Response.json({ error: "伺服器尚未設定 GITHUB_TOKEN、GITHUB_OWNER、GITHUB_REPO。" }, { status: 503 });
     }

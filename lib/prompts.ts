@@ -8,11 +8,7 @@ export const ROLE_LENS = {
 
 export const HTML_BLOCK_BEGIN = "⟦CO_PROMPT_HTML_BEGIN⟧";
 export const HTML_BLOCK_END = "⟦CO_PROMPT_HTML_END⟧";
-export const HTML_OUTPUT_PROTOCOL = `For any implementation or webpage request, return one complete browser-runnable HTML document between these exact sentinel lines:
-${HTML_BLOCK_BEGIN}
-<!doctype html>...
-${HTML_BLOCK_END}
-Return no Markdown code fences inside those sentinels. Include all required CSS and JavaScript in that one document.`;
+export const HTML_OUTPUT_PROTOCOL = `For any implementation or webpage request, return one complete browser-runnable HTML document between these exact sentinel lines:\n${HTML_BLOCK_BEGIN}\n<!doctype html>...\n${HTML_BLOCK_END}\nReturn no Markdown code fences inside those sentinels. Include all required CSS and JavaScript in that one document.`;
 
 export const ROOM_AGENT_SYSTEM = `你是多人協作房間的共用 agent，多位人類會同時導引你。
 - 意圖文件是真正的原始碼；對話負責導引，意圖負責決定。

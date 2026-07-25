@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RoomEvent, RoomProgress } from "@/lib/domain";
-import { addMessage, createOrJoinRoom, markMessagesSeen, startRun, subscribe } from "@/lib/server/rooms";
+import { addMessage, createRoom, joinRoom, markMessagesSeen, startRun, subscribe } from "@/lib/server/rooms";
 import { reportProgress } from "@/lib/server/run-agent";
 
 /**
@@ -10,15 +10,16 @@ import { reportProgress } from "@/lib/server/run-agent";
  */
 
 function room() {
-  const created = createOrJoinRoom({
+  const created = createRoom({
     title: "progress",
+    visibility: "public",
     participant: { userId: "u-amy", name: "Amy", role: "pm" },
   });
-  createOrJoinRoom({
-    roomId: created.id,
+  joinRoom({
+    roomId: created.room.id,
     participant: { userId: "u-joe", name: "Joe", role: "eng" },
   });
-  return created.id;
+  return created.room.id;
 }
 
 function capture(roomId: string) {
@@ -114,7 +115,7 @@ describe("room progress", () => {
     const roomId = room();
     const run = startRun(roomId, "u-amy", "cheap");
     addMessage(roomId, {
-      authorName: "co-prompt agent", userId: "agent", role: "agent",
+      authorName: "CoPrompt agent", userId: "agent", role: "agent",
       kind: "agent", content: "thinking", runId: run.id,
     });
 

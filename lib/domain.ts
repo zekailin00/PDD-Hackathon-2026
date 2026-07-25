@@ -3,11 +3,14 @@ import type { Role } from "@/pdd/role-policy";
 
 export type RoomState = "IDLE" | "RUNNING" | "AWAITING_INPUT" | "PROPOSED";
 export type RunStatus = "running" | "proposed" | "done" | "halted" | "error";
+export type Presence = "online" | "away" | "offline";
+export type RoomVisibility = "public" | "private";
 
 export type Participant = {
   userId: string;
   name: string;
   role: Role;
+  status: Presence;
   lastSeenAt: string;
 };
 
@@ -16,7 +19,7 @@ export type RoomMessage = {
   authorName: string;
   userId: string;
   role: Role | "agent";
-  kind: "prompt" | "steer" | "agent" | "question" | "answer" | "system";
+  kind: "prompt" | "member" | "steer" | "agent" | "question" | "answer" | "system";
   content: string;
   runId?: string;
   replyTo?: string;
@@ -68,6 +71,16 @@ export type VoteRecord = {
 export type Room = {
   id: string;
   title: string;
+  createdBy: string;
+  visibility: RoomVisibility;
+  systemPrompt: string;
+  preferredModel?: string;
+  sourceArchive?: {
+    name: string;
+    fileCount: number;
+    truncated: boolean;
+  };
+  isDemo?: boolean;
   state: RoomState;
   intent: string;
   participants: Participant[];
@@ -78,6 +91,13 @@ export type Room = {
   votes: VoteRecord[];
   createdAt: string;
   updatedAt: string;
+};
+
+export type PublicRoom = {
+  id: string;
+  title: string;
+  participantCount: number;
+  isDemo: boolean;
 };
 
 export type AgentPhase = "reading" | "planning" | "building" | "reviewing" | "done";

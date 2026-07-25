@@ -1,25 +1,43 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import type {
-  Artifact, Participant, Room, RoomEvent, RoomMessage, RoomRun, Steer, VoteRecord,
+  Artifact,
+  Participant,
+  Presence,
+  PublicRoom,
+  Room,
+  RoomEvent,
+  RoomMessage,
+  RoomRun,
+  RoomVisibility,
+  Steer,
+  VoteRecord,
 } from "@/lib/domain";
+import { ROOM_AGENT_SYSTEM } from "@/lib/prompts";
 import type { Difficulty } from "@/pdd/model-router";
 import type { Role } from "@/pdd/role-policy";
 
 type Listener = (event: RoomEvent) => void;
-type Store = { rooms: Map<string, Room>; listeners: Map<string, Set<Listener>> };
+type RoomSecret = { inviteCode: string; apiKey?: string; baseUrl?: string };
+type Store = {
+  rooms: Map<string, Room>;
+  listeners: Map<string, Set<Listener>>;
+  secrets: Map<string, RoomSecret>;
+  sourceContexts: Map<string, string>;
+};
 
 const globalStore = globalThis as typeof globalThis & { __copromptStore?: Store };
 const store: Store = globalStore.__copromptStore ?? {
   rooms: new Map<string, Room>(),
   listeners: new Map<string, Set<Listener>>(),
+  secrets: new Map<string, RoomSecret>(),
+  sourceContexts: new Map<string, string>(),
 };
 globalStore.__copromptStore = store;
+store.sourceContexts ??= new Map<string, string>();
 
 const now = () => new Date().toISOString();
-
-function sameName(a: string, b: string): boolean {
-  return a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase();
-}
+const inviteCode = () => randomBytes(18).toString("base64url");
+const sameName = (a: string, b: string) => a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase();
 
 function cleanRoomId(value: string): string {
   const id = value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 48);
@@ -27,56 +45,180 @@ function cleanRoomId(value: string): string {
   return id;
 }
 
+function participant(input: { userId: string; name: string; role: Role }): Participant {
+  return { ...input, status: "online", lastSeenAt: now() };
+}
+
+function seedDemoRoom(): void {
+  if (store.rooms.has("demo")) return;
+  const timestamp = now();
+  store.rooms.set("demo", {
+    id: "demo",
+    title: "Demo",
+    createdBy: "demo-owner",
+    visibility: "public",
+    systemPrompt: ROOM_AGENT_SYSTEM,
+    preferredModel: "",
+    isDemo: true,
+    state: "IDLE",
+    intent: "## Goal\n建立一個清楚、可共同審核的產品變更。\n\n## Acceptance criteria\n1. 產物可預覽\n2. 測試與驗收條件一致\n\n## Must not\n- 不得洩漏任何 API key\n",
+    participants: [],
+    messages: [{
+      id: randomUUID(),
+      authorName: "CoPrompt",
+      userId: "agent",
+      role: "agent",
+      kind: "system",
+      content: "這是唯一含有示範資料的 Demo 房間。加入後可直接體驗共同意圖、Member Chat、Steering Queue 與核准流程。",
+      createdAt: timestamp,
+    }],
+    runs: [],
+    steers: [],
+    artifacts: [],
+    votes: [],
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+  store.secrets.set("demo", { inviteCode: inviteCode() });
+}
+
+seedDemoRoom();
+
 export function getRoom(roomId: string): Room | undefined {
   return store.rooms.get(cleanRoomId(roomId));
 }
 
-export function createOrJoinRoom(input: {
-  roomId?: string;
+export function listPublicRooms(): PublicRoom[] {
+  return [...store.rooms.values()]
+    .filter((room) => room.visibility === "public")
+    .map((room) => ({
+      id: room.id,
+      title: room.title,
+      participantCount: room.participants.filter((person) => person.status !== "offline").length,
+      isDemo: Boolean(room.isDemo),
+    }))
+    .sort((a, b) => Number(b.isDemo) - Number(a.isDemo) || a.title.localeCompare(b.title));
+}
+
+export function createRoom(input: {
   title?: string;
+  visibility: RoomVisibility;
+  systemPrompt?: string;
+  preferredModel?: string;
+  apiKey?: string;
+  baseUrl?: string;
+  sourceArchive?: {
+    name: string;
+    fileCount: number;
+    truncated: boolean;
+    context: string;
+  };
+  participant: { userId: string; name: string; role: Role };
+}): { room: Room; inviteCode: string } {
+  let roomId = randomUUID().slice(0, 8);
+  while (store.rooms.has(roomId)) roomId = randomUUID().slice(0, 8);
+  const timestamp = now();
+  const room: Room = {
+    id: roomId,
+    title: input.title?.trim().slice(0, 100) || "Untitled room",
+    createdBy: input.participant.userId,
+    visibility: input.visibility,
+    systemPrompt: input.systemPrompt?.trim().slice(0, 20_000) || ROOM_AGENT_SYSTEM,
+    preferredModel: input.preferredModel?.trim().slice(0, 200) || "",
+    sourceArchive: input.sourceArchive ? {
+      name: input.sourceArchive.name,
+      fileCount: input.sourceArchive.fileCount,
+      truncated: input.sourceArchive.truncated,
+    } : undefined,
+    state: "IDLE",
+    intent: "## Goal\n\n## Acceptance criteria\n\n## Must not\n",
+    participants: [participant(input.participant)],
+    messages: [{
+      id: randomUUID(),
+      authorName: "CoPrompt",
+      userId: "agent",
+      role: "agent",
+      kind: "system",
+      content: input.sourceArchive
+        ? `房間已準備好，已載入 ${input.sourceArchive.name} 的 ${input.sourceArchive.fileCount} 個文字檔${input.sourceArchive.truncated ? "（已依安全限制截斷）" : ""}。共同編寫意圖，然後啟動 agent。`
+        : "房間已準備好。共同編寫意圖，然後啟動 agent。",
+      createdAt: timestamp,
+    }],
+    runs: [],
+    steers: [],
+    artifacts: [],
+    votes: [],
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  const secret: RoomSecret = {
+    inviteCode: inviteCode(),
+    apiKey: input.apiKey?.trim() || undefined,
+    baseUrl: input.baseUrl?.trim() || undefined,
+  };
+  store.rooms.set(roomId, room);
+  store.secrets.set(roomId, secret);
+  if (input.sourceArchive) store.sourceContexts.set(roomId, input.sourceArchive.context);
+  return { room, inviteCode: secret.inviteCode };
+}
+
+export function joinRoom(input: {
+  roomId: string;
+  inviteCode?: string;
   participant: { userId: string; name: string; role: Role };
 }): Room {
-  const roomId = cleanRoomId(input.roomId || randomUUID().slice(0, 8));
-  let room = store.rooms.get(roomId);
-  const timestamp = now();
-  if (!room) {
-    room = {
-      id: roomId,
-      title: input.title?.trim().slice(0, 100) || "Untitled room",
-      state: "IDLE",
-      intent: "## Goal\n\n## Acceptance criteria\n\n## Must not\n",
-      participants: [],
-      messages: [{
-        id: randomUUID(), authorName: "co-prompt", userId: "agent", role: "agent",
-        kind: "system", content: "房間已準備好。共同編寫意圖，然後啟動 agent。", createdAt: timestamp,
-      }],
-      runs: [], steers: [], artifacts: [], votes: [], createdAt: timestamp, updatedAt: timestamp,
-    };
-    store.rooms.set(roomId, room);
+  const room = getRoom(input.roomId);
+  if (!room) throw new Error("Room not found.");
+  const secret = store.secrets.get(room.id);
+  if (room.visibility === "private" && input.inviteCode !== secret?.inviteCode) {
+    throw new Error("這個私人房間需要有效邀請連結。");
   }
-  // A name is the room-level identity. Reusing it after a refresh or from a
-  // second browser restores the existing participant and their role.
+  // Names are the stable room-level identity: refreshing or rejoining with
+  // the same name restores the existing participant and its role.
   const existing = room.participants.find((item) => sameName(item.name, input.participant.name));
-  const participant: Participant = existing
-    ? { ...existing, lastSeenAt: timestamp }
-    : { ...input.participant, lastSeenAt: timestamp };
-  room.participants = [...room.participants.filter((item) => item.userId !== participant.userId), participant];
-  room.updatedAt = timestamp;
-  publish(roomId, { type: "presence", participants: room.participants });
+  const joined = existing ? { ...existing, status: "online" as const, lastSeenAt: now() } : participant(input.participant);
+  room.participants = [...room.participants.filter((item) => item.userId !== joined.userId), joined];
+  room.updatedAt = joined.lastSeenAt;
+  publish(room.id, { type: "presence", participants: room.participants });
+  publishSnapshot(room);
   return room;
 }
 
-export function removeParticipant(roomId: string, userId: string, presenceStamp?: string): Room {
+export function updateRoomSettings(
+  roomId: string,
+  userId: string,
+  patch: {
+    title?: string;
+    visibility?: RoomVisibility;
+    systemPrompt?: string;
+    preferredModel?: string;
+    apiKey?: string;
+    baseUrl?: string;
+  },
+): { room: Room; inviteCode: string } {
   const room = requiredRoom(roomId);
-  const participant = room.participants.find((item) => item.userId === userId);
-  // A delayed page-close beacon from an old tab must never erase the new tab
-  // that just rejoined as the same named participant.
-  if (presenceStamp && participant?.lastSeenAt !== presenceStamp) return room;
-  room.participants = room.participants.filter((item) => item.userId !== userId);
+  if (room.createdBy !== userId) throw new Error("只有建立者可以修改房間設定。");
+  if (room.isDemo) throw new Error("Demo 房間設定不可修改。");
+  if (patch.title !== undefined) room.title = patch.title.trim().slice(0, 100) || room.title;
+  if (patch.visibility !== undefined) room.visibility = patch.visibility;
+  if (patch.systemPrompt !== undefined) room.systemPrompt = patch.systemPrompt.trim().slice(0, 20_000) || ROOM_AGENT_SYSTEM;
+  if (patch.preferredModel !== undefined) room.preferredModel = patch.preferredModel.trim().slice(0, 200);
+  const secret = store.secrets.get(room.id) ?? { inviteCode: inviteCode() };
+  if (patch.apiKey !== undefined) secret.apiKey = patch.apiKey.trim() || undefined;
+  if (patch.baseUrl !== undefined) secret.baseUrl = patch.baseUrl.trim() || undefined;
+  store.secrets.set(room.id, secret);
   room.updatedAt = now();
-  publish(roomId, { type: "presence", participants: room.participants });
   publishSnapshot(room);
-  return room;
+  return { room, inviteCode: secret.inviteCode };
+}
+
+export function getRoomProvider(roomId: string): { apiKey?: string; baseUrl?: string } {
+  const secret = store.secrets.get(cleanRoomId(roomId));
+  return { apiKey: secret?.apiKey, baseUrl: secret?.baseUrl };
+}
+
+export function getRoomSourceContext(roomId: string): string {
+  return store.sourceContexts.get(cleanRoomId(roomId)) ?? "";
 }
 
 export function updateIntent(roomId: string, intent: string): Room {
@@ -86,6 +228,27 @@ export function updateIntent(roomId: string, intent: string): Room {
   room.updatedAt = now();
   publishSnapshot(room);
   return room;
+}
+
+export function setPresence(roomId: string, userId: string, status: Presence): void {
+  const room = requiredRoom(roomId);
+  const person = room.participants.find((item) => item.userId === userId);
+  if (!person) return;
+  person.status = status;
+  person.lastSeenAt = now();
+  publish(room.id, { type: "presence", participants: room.participants });
+  publishSnapshot(room);
+}
+
+export function removeParticipant(roomId: string, userId: string, presenceStamp?: string): void {
+  const room = requiredRoom(roomId);
+  const participant = room.participants.find((item) => item.userId === userId);
+  // Ignore a delayed close beacon from a tab that was refreshed or rejoined.
+  if (presenceStamp && participant?.lastSeenAt !== presenceStamp) return;
+  room.participants = room.participants.filter((item) => item.userId !== userId);
+  room.updatedAt = now();
+  publish(room.id, { type: "presence", participants: room.participants });
+  publishSnapshot(room);
 }
 
 export function addMessage(roomId: string, message: Omit<RoomMessage, "id" | "createdAt">): RoomMessage {

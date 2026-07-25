@@ -12,7 +12,7 @@ export async function POST(request: Request, context: { params: Promise<{ roomId
     const parsed = z.object({
       content: z.string().trim().min(1).max(8_000),
       replyTo: z.string().uuid().optional(),
-      kind: z.enum(["prompt", "answer"]).default("prompt"),
+      kind: z.enum(["member", "answer"]).default("member"),
     }).safeParse(await request.json());
     if (!parsed.success) return Response.json({ error: "訊息格式錯誤。" }, { status: 400 });
     if (parsed.data.replyTo && !getRoom(roomId)?.messages.some((item) => item.id === parsed.data.replyTo)) {
@@ -26,7 +26,7 @@ export async function POST(request: Request, context: { params: Promise<{ roomId
     // else's.
     const room = getRoom(roomId);
     const run = room && [...room.runs].reverse().find((item) => item.status === "running");
-    if (run) {
+    if (run && parsed.data.kind !== "member") {
       reportProgress({
         roomId, runId: run.id, phase: "building", step: run.step,
         label: `${identity.name} 的訊息已送出，等待 agent 於下個檢查點讀取`,

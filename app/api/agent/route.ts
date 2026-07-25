@@ -10,7 +10,6 @@ const schema = z.object({
   prompt: z.string().min(1).max(20_000),
   difficulty: z.enum(["cheap", "standard", "hard"]).default("standard"),
   prefer: z.string().max(200).optional(),
-  apiKey: z.string().min(1).max(500).optional(),
 });
 
 export async function POST(request: Request) {
