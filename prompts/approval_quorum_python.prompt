@@ -1,0 +1,100 @@
+% approval_quorum — decide when a room's proposal may become a pull request
+
+# Module: approval_quorum
+
+## Intent
+
+The Ensemble agent has read-only access to the codebase. It can propose a
+patch, but it can never write to the repository. A proposal becomes a real
+pull request only when the room agrees.
+
+This module is the gate. It answers one question: given who is in the room and
+how they voted, may this proposal be opened as a PR, and if not, what is it
+waiting on?
+
+This is pure decision logic. No I/O, no network, no clock, no global state.
+
+## Interface
+
+```python
+def evaluate(
+    members: list[str],
+    votes: list[dict],
+    policy: str = "unanimous",
+) -> dict:
+    ...
+```
+
+- `members` — every participant currently in the room, by user_id.
+- `votes` — append-only vote log, oldest first. Each entry is
+  `{"user_id": str, "verdict": "approve" | "request_changes"}`.
+  A participant may vote more than once; only their LAST vote counts.
+- `policy` — one of:
+  - `"unanimous"` — every member must approve
+  - `"majority"` — more than half of members must approve
+- Returns:
+  ```python
+  {
+      "can_open_pr": bool,
+      "approved_by": list[str],   # sorted, user_ids whose last vote was approve
+      "blocked_by": list[str],    # sorted, user_ids whose last vote was request_changes
+      "waiting_on": list[str],    # sorted, members who have not voted at all
+      "reason": str,              # short human-readable explanation
+  }
+  ```
+
+## MUST
+
+- MUST count only each participant's most recent vote.
+- MUST return `can_open_pr` as `False` whenever `blocked_by` is non-empty,
+  under every policy. A single `request_changes` is a veto.
+- MUST return `can_open_pr` as `False` when `members` is empty.
+- MUST ignore votes from user_ids that are not in `members`, and MUST NOT let
+  them appear in any of the three returned lists.
+- MUST return all three lists sorted ascending, so two clients rendering the
+  same state show the same order.
+- MUST make `approved_by`, `blocked_by`, and `waiting_on` mutually exclusive,
+  and together they MUST cover exactly `members`.
+- MUST raise `ValueError` for an unknown `policy`.
+- MUST raise `ValueError` for a vote whose `verdict` is neither `"approve"`
+  nor `"request_changes"`.
+
+## MUST NOT
+
+- MUST NOT mutate `members` or `votes`.
+- MUST NOT treat a missing vote as an approval.
+- MUST NOT let a duplicate member in `members` be counted twice.
+- MUST NOT perform any I/O.
+
+## Examples
+
+```python
+evaluate(["amy", "joe"], [{"user_id": "amy", "verdict": "approve"}])
+# -> can_open_pr False, approved_by ["amy"], waiting_on ["joe"],
+#    reason "waiting on joe"
+
+evaluate(["amy", "joe"], [{"user_id": "amy", "verdict": "approve"},
+                          {"user_id": "joe", "verdict": "approve"}])
+# -> can_open_pr True, reason "2 of 2 approved"
+
+# Last vote wins: joe changed his mind, so the veto is lifted.
+evaluate(["amy", "joe"], [{"user_id": "amy", "verdict": "approve"},
+                          {"user_id": "joe", "verdict": "request_changes"},
+                          {"user_id": "joe", "verdict": "approve"}])
+# -> can_open_pr True
+
+# A veto outranks a majority.
+evaluate(["a", "b", "c"], [{"user_id": "a", "verdict": "approve"},
+                           {"user_id": "b", "verdict": "approve"},
+                           {"user_id": "c", "verdict": "request_changes"}],
+         policy="majority")
+# -> can_open_pr False, blocked_by ["c"]
+
+evaluate([], [])
+# -> can_open_pr False, reason "no members in room"
+```
+
+## Done when
+
+- Every example above returns exactly the stated result.
+- The module has no imports beyond the standard library.
