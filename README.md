@@ -4,6 +4,8 @@
 
 Built at the PDD Hackathon 2026 · Palo Alto · 25 July 2026
 
+**Live:** https://coprompt-ai.onrender.com
+
 ---
 
 ## The problem
