@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import Image from "next/image";
 import {
   Avatar,
@@ -246,6 +246,12 @@ const presenceColor = { online: "#59cf96", away: "#f2b84b", offline: "#6d707c" }
 
 type Identity = { userId: string; name: string; role: Role };
 type RoomResponse = { room: Room; token: string; inviteCode?: string; error?: string };
+
+function submitOnEnter(event: KeyboardEvent<HTMLTextAreaElement>, submit: () => void): void {
+  if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+  event.preventDefault();
+  submit();
+}
 
 export default function Home() {
   const [locale, setLocale] = useState<Locale>("en");
@@ -604,7 +610,14 @@ export default function Home() {
             })}</Box>
           <Box className="chat-compose">
             {replyTo && <Flex justify="between"><Text size="1" color="gray">{copy.replyingTo} {room.messages.find((item) => item.id === replyTo)?.authorName || copy.message}; {copy.memberOnly}</Text><Button size="1" variant="ghost" onClick={() => setReplyTo("")}>{copy.cancel}</Button></Flex>}
-            <TextArea value={chatDraft} onChange={(event) => setChatDraft(event.target.value)} placeholder={copy.memberPlaceholder} />
+            <TextArea
+              value={chatDraft}
+              onChange={(event) => setChatDraft(event.target.value)}
+              onKeyDown={(event) => submitOnEnter(event, () => {
+                if (chatDraft.trim()) void sendMessage();
+              })}
+              placeholder={copy.memberPlaceholder}
+            />
             <Button size="1" variant="soft" onClick={sendMessage} disabled={!chatDraft.trim()}>{copy.sendMemberChat}</Button>
           </Box>
         </section>
@@ -619,10 +632,24 @@ export default function Home() {
           <Box className="stream-output"><pre>{liveOutput || latestOutput(room) || copy.defaultOutput}</pre></Box>
           {room.state === "RUNNING" ? <Card className="steer-box">
             <Text size="2" weight="bold">Steering Queue</Text>
-            <TextArea value={steer} onChange={(event) => setSteer(event.target.value)} placeholder={copy.steeringPlaceholder} />
+            <TextArea
+              value={steer}
+              onChange={(event) => setSteer(event.target.value)}
+              onKeyDown={(event) => submitOnEnter(event, () => {
+                if (steer.trim()) void sendSteer("nudge");
+              })}
+              placeholder={copy.steeringPlaceholder}
+            />
             <Flex gap="2"><Button size="2" onClick={() => sendSteer("nudge")} disabled={!steer.trim()}>⚡ Nudge</Button><Button size="2" color="red" variant="soft" onClick={() => sendSteer("halt")}>Halt</Button></Flex>
           </Card> : <Card className="run-box">
-            <TextArea value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder={copy.runPlaceholder} />
+            <TextArea
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              onKeyDown={(event) => submitOnEnter(event, () => {
+                if (!busy && prompt.trim()) void run();
+              })}
+              placeholder={copy.runPlaceholder}
+            />
             <Flex justify="between" align="center">
               <Select.Root value={difficulty} onValueChange={(value) => setDifficulty(value as Difficulty)}>
                 <Select.Trigger />
