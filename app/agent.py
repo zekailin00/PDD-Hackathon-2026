@@ -18,11 +18,9 @@ import json
 
 import httpx
 
-from . import hub, keys, repo_reader, state
+from . import hub, keys, memory, providers, repo_reader, state
 
-ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_VERSION = "2023-06-01"
-DEFAULT_MODEL = "claude-opus-4-20250514"
 MAX_STEPS = 10
 FLUSH_INTERVAL = 0.06        # seconds between token broadcasts
 HALT_CHECK_EVERY = 40        # deltas between mid-stream halt checks
@@ -87,6 +85,21 @@ TOOLS = [
         },
     },
     {
+        "name": "log_decision",
+        "description": (
+            "Record a decision the room reached, so later runs in this room "
+            "remember it without anyone re-typing it."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "decision": {"type": "string"},
+                "rationale": {"type": "string"},
+            },
+            "required": ["decision"],
+        },
+    },
+    {
         "name": "propose_patch",
         "description": (
             "Propose a change for the room to approve. This does NOT write to "
@@ -132,6 +145,11 @@ def build_messages(room: state.Room, run_id: str) -> list[dict]:
     )
     lines.append(f"\n# Who is in the room\n\n{roster or '(nobody)'}")
 
+    remembered = memory.recall(room.id, room.intent[:200])
+    if remembered:
+        lines.append("\n# What this room already decided\n\n"
+                     + "\n".join(f"- {r}" for r in remembered))
+
     convo = [m for m in room.messages
              if m.kind in ("prompt", "steer", "agent", "question", "answer")][-40:]
     if convo:
@@ -167,6 +185,15 @@ async def _run_tool(room: state.Room, run_id: str, name: str, args: dict) -> tup
 
         if name == "ask_room":
             return await _ask_room(room, run_id, args), False
+
+        if name == "log_decision":
+            memory.record_decision(room.id, args["decision"],
+                                   args.get("rationale", ""), by="Ensemble")
+            hub.publish(room.id, "decision", {
+                "decision": args["decision"],
+                "rationale": args.get("rationale", ""),
+            })
+            return "Decision recorded in room memory.", False
 
         if name == "propose_patch":
             return _propose_patch(room, run_id, args), True
@@ -235,7 +262,7 @@ def _propose_patch(room: state.Room, run_id: str, args: dict) -> str:
 # the loop
 # --------------------------------------------------------------------------
 
-async def run_agent(room: state.Room, run_id: str, model: str = DEFAULT_MODEL) -> None:
+async def run_agent(room: state.Room, run_id: str, model: str | None = None) -> None:
     run = room.runs[run_id]
     entry = keys.pick_billing_key(room.id, run.started_by)
     if entry is None:
@@ -247,6 +274,15 @@ async def run_agent(room: state.Room, run_id: str, model: str = DEFAULT_MODEL) -
         })
         hub.publish(room.id, "state", {"state": room.state})
         return
+
+    provider = entry.get("provider", providers.DEFAULT_PROVIDER)
+    endpoint = providers.endpoint(provider)
+    model = model or providers.default_model(provider)
+    hub.publish(room.id, "provider", {
+        "run_id": run_id,
+        "provider": providers.resolve(provider)["label"],
+        "model": model,
+    })
 
     messages = build_messages(room, run_id)
     transcript = ""
@@ -283,7 +319,7 @@ async def run_agent(room: state.Room, run_id: str, model: str = DEFAULT_MODEL) -
                                               "label": "thinking"})
 
                 text, tool_calls, halted = await _stream_step(
-                    client, entry["key"], model, messages, room, run
+                    client, entry["key"], endpoint, model, messages, room, run
                 )
                 if halted:
                     run.status = "halted"
@@ -350,7 +386,7 @@ async def run_agent(room: state.Room, run_id: str, model: str = DEFAULT_MODEL) -
         })
 
 
-async def _stream_step(client, api_key, model, messages, room, run):
+async def _stream_step(client, api_key, endpoint, model, messages, room, run):
     """One model turn, rebroadcast token by token. Returns (text, calls, halted)."""
     body = {
         "model": model,
@@ -361,7 +397,11 @@ async def _stream_step(client, api_key, model, messages, room, run):
         "stream": True,
     }
     headers = {
+        # Anthropic authenticates with x-api-key; routers fronting the same
+        # Messages API generally accept a bearer token. Sending both keeps one
+        # streaming implementation working against either.
         "x-api-key": api_key,
+        "authorization": f"Bearer {api_key}",
         "anthropic-version": ANTHROPIC_VERSION,
         "content-type": "application/json",
     }
@@ -378,7 +418,7 @@ async def _stream_step(client, api_key, model, messages, room, run):
         hub.publish(room.id, "token", {"run_id": run.id, "chunk": buf})
         buf, last_flush = "", now
 
-    async with client.stream("POST", ANTHROPIC_URL, json=body, headers=headers) as resp:
+    async with client.stream("POST", endpoint, json=body, headers=headers) as resp:
         if resp.status_code >= 400:
             detail = (await resp.aread()).decode("utf-8", "replace")[:400]
             raise httpx.HTTPStatusError(detail, request=resp.request, response=resp)

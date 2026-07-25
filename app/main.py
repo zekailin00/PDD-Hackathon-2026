@@ -8,7 +8,7 @@ from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import agent, github_pr, hub, keys, state
+from . import agent, github_pr, hub, keys, memory, providers, state
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -331,6 +331,21 @@ async def open_pr(room_id: str, proposal_id: str, body: dict = Body(...)):
 # health + static
 # --------------------------------------------------------------------------
 
+@app.get("/api/providers")
+async def list_providers():
+    """Which vendors a participant may bring a key for. Never returns keys."""
+    return {"providers": providers.public_catalog()}
+
+
+@app.get("/api/rooms/{room_id}/memory")
+async def room_memory(room_id: str):
+    return {
+        "backend": "mem0" if memory.enabled() else "in-process",
+        "decisions": memory.local_decisions(room_id),
+        "recalled": memory.recall(room_id),
+    }
+
+
 @app.get("/api/health")
 async def health():
     generated = {}
@@ -346,6 +361,8 @@ async def health():
         "pdd_modules": generated,
         "github_configured": bool(os.environ.get("GITHUB_TOKEN")
                                   and os.environ.get("GITHUB_REPO")),
+        "memory_backend": "mem0" if memory.enabled() else "in-process",
+        "providers": [p["id"] for p in providers.public_catalog()],
     }
 
 
