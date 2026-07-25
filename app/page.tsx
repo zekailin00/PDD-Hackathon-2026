@@ -92,7 +92,9 @@ export default function Home() {
     const data = await response.json();
     if (!response.ok) return setNotice(data.error);
     localStorage.setItem(identityKey, JSON.stringify(nextIdentity));
-    setIdentity(nextIdentity); setToken(data.token); setRoom(data.room); setIntentDraft(data.room.intent);
+    const resolvedIdentity = data.identity as Identity;
+    localStorage.setItem(identityKey, JSON.stringify(resolvedIdentity));
+    setIdentity(resolvedIdentity); setToken(data.token); setRoom(data.room); setIntentDraft(data.room.intent);
     window.history.replaceState({}, "", `?room=${data.room.id}`);
   };
 
@@ -169,6 +171,23 @@ export default function Home() {
     localStorage.setItem(tokenRouterKey, value);
     setApiKey(value); setNotice("TokenRouter key saved in this browser only.");
   };
+  const leaveRoom = async () => {
+    if (!room || !token) return;
+    const presenceStamp = room.participants.find((person) => person.userId === identity?.userId)?.lastSeenAt;
+    await fetch(`/api/rooms/${room.id}/leave`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ presenceStamp }) }).catch(() => undefined);
+    setRoom(null); setToken(""); setProgress(null); setLiveOutput("");
+    window.history.replaceState({}, "", window.location.pathname);
+  };
+
+  useEffect(() => {
+    if (!room || !token) return;
+    const presenceStamp = room.participants.find((person) => person.userId === identity?.userId)?.lastSeenAt;
+    const leaveOnClose = () => {
+      navigator.sendBeacon(`/api/rooms/${room.id}/leave`, new Blob([JSON.stringify({ token, presenceStamp })], { type: "application/json" }));
+    };
+    window.addEventListener("pagehide", leaveOnClose);
+    return () => window.removeEventListener("pagehide", leaveOnClose);
+  }, [room?.id, token]);
   const copyRoomCode = async () => {
     if (!room) return;
     try {
@@ -183,7 +202,7 @@ export default function Home() {
         <header className="topbar">
           <Flex align="center" gap="3"><Box className="brand-mark">⌘</Box><Heading size="3">co-prompt</Heading><Badge color="indigo">PDD multiplayer</Badge></Flex>
           <Flex align="center" gap="2"><Badge color={room.state === "RUNNING" ? "amber" : room.state === "PROPOSED" ? "violet" : "green"}>{room.state}</Badge><Text size="2">{room.title}</Text></Flex>
-          <Flex justify="end" align="center" gap="2"><Button size="1" variant="soft" onClick={() => void copyRoomCode()}>{roomCodeCopied ? "Copied" : `Room ${room.id}`}</Button>{room.participants.slice(0, 5).map((person) => <Avatar key={person.userId} fallback={person.name.slice(0, 2).toUpperCase()} color={roleColor[person.role]} size="2" title={`${person.name} · ${person.role}`} />)}<Badge color={roleColor[identity.role]}>{identity.role.toUpperCase()}</Badge></Flex>
+          <Flex justify="end" align="center" gap="2"><Button size="1" variant="soft" onClick={() => void copyRoomCode()}>{roomCodeCopied ? "Copied" : `Room ${room.id}`}</Button>{room.participants.slice(0, 5).map((person) => <Avatar key={person.userId} fallback={person.name.slice(0, 2).toUpperCase()} color={roleColor[person.role]} size="2" title={`${person.name} · ${person.role}`} />)}<Badge color={roleColor[identity.role]}>{identity.role.toUpperCase()}</Badge><Button size="1" color="red" variant="soft" onClick={() => void leaveRoom()}>Leave</Button></Flex>
         </header>
 
         <section className="ensemble-grid">

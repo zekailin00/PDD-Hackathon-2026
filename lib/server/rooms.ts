@@ -17,6 +17,10 @@ globalStore.__copromptStore = store;
 
 const now = () => new Date().toISOString();
 
+function sameName(a: string, b: string): boolean {
+  return a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase();
+}
+
 function cleanRoomId(value: string): string {
   const id = value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 48);
   if (!id) throw new Error("Room id is required.");
@@ -50,10 +54,28 @@ export function createOrJoinRoom(input: {
     };
     store.rooms.set(roomId, room);
   }
-  const participant: Participant = { ...input.participant, lastSeenAt: timestamp };
+  // A name is the room-level identity. Reusing it after a refresh or from a
+  // second browser restores the existing participant and their role.
+  const existing = room.participants.find((item) => sameName(item.name, input.participant.name));
+  const participant: Participant = existing
+    ? { ...existing, lastSeenAt: timestamp }
+    : { ...input.participant, lastSeenAt: timestamp };
   room.participants = [...room.participants.filter((item) => item.userId !== participant.userId), participant];
   room.updatedAt = timestamp;
   publish(roomId, { type: "presence", participants: room.participants });
+  return room;
+}
+
+export function removeParticipant(roomId: string, userId: string, presenceStamp?: string): Room {
+  const room = requiredRoom(roomId);
+  const participant = room.participants.find((item) => item.userId === userId);
+  // A delayed page-close beacon from an old tab must never erase the new tab
+  // that just rejoined as the same named participant.
+  if (presenceStamp && participant?.lastSeenAt !== presenceStamp) return room;
+  room.participants = room.participants.filter((item) => item.userId !== userId);
+  room.updatedAt = now();
+  publish(roomId, { type: "presence", participants: room.participants });
+  publishSnapshot(room);
   return room;
 }
 

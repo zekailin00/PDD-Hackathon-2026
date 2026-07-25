@@ -16,11 +16,13 @@ export async function POST(request: Request) {
   const parsed = schema.safeParse(await request.json());
   if (!parsed.success) return Response.json({ error: "房間資料格式錯誤。" }, { status: 400 });
   const room = createOrJoinRoom({ roomId: parsed.data.roomId, title: parsed.data.title, participant: parsed.data });
+  const participant = room.participants.find((item) => item.name.trim().toLocaleLowerCase() === parsed.data.name.trim().toLocaleLowerCase());
+  if (!participant) return Response.json({ error: "Could not join room." }, { status: 500 });
   const token = issueIdentity({
     roomId: room.id,
-    userId: parsed.data.userId,
-    name: parsed.data.name,
-    role: parsed.data.role,
+    userId: participant.userId,
+    name: participant.name,
+    role: participant.role,
   });
-  return Response.json({ room, token });
+  return Response.json({ room, token, identity: { userId: participant.userId, name: participant.name, role: participant.role } });
 }

@@ -18,9 +18,7 @@ export function issueIdentity(identity: Identity): string {
   return `${payload}.${signature(payload)}`;
 }
 
-export function verifyIdentity(request: Request, roomId: string): Identity {
-  const header = request.headers.get("authorization") ?? "";
-  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+export function verifyIdentityToken(token: string, roomId: string): Identity {
   const [payload, provided] = token.split(".");
   if (!payload || !provided) throw new Error("缺少有效的房間身分。");
   const expected = signature(payload);
@@ -30,4 +28,9 @@ export function verifyIdentity(request: Request, roomId: string): Identity {
   const identity = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as Identity;
   if (identity.roomId !== roomId) throw new Error("房間身分不符。");
   return identity;
+}
+
+export function verifyIdentity(request: Request, roomId: string): Identity {
+  const header = request.headers.get("authorization") ?? "";
+  return verifyIdentityToken(header.startsWith("Bearer ") ? header.slice(7) : "", roomId);
 }
