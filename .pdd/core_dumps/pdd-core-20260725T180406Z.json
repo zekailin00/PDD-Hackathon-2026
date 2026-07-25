@@ -1,0 +1,39 @@
+{
+  "schema_version": 2,
+  "pdd_version": "0.0.308",
+  "timestamp_utc": "20260725T180406Z",
+  "argv": [
+    "setup"
+  ],
+  "cwd": "/Users/zekailin00/Git/pdd/PDD-Hackathon-2026",
+  "platform": {
+    "system": "Darwin",
+    "release": "25.3.0",
+    "version": "Darwin Kernel Version 25.3.0: Wed Jan 28 20:55:08 PST 2026; root:xnu-12377.91.3~2/RELEASE_ARM64_T6020",
+    "python": "3.12.8 (v3.12.8:2dc476bcb91, Dec  3 2024, 14:43:19) [Clang 13.0.0 (clang-1300.0.29.30)]"
+  },
+  "global_options": {
+    "force": false,
+    "strength": null,
+    "temperature": null,
+    "time": 0.25,
+    "verbose": false,
+    "quiet": false,
+    "local": false,
+    "context": null,
+    "output_cost": null,
+    "review_examples": false
+  },
+  "invoked_subcommands": [],
+  "total_cost": 0.0,
+  "steps": [],
+  "errors": [],
+  "environment": {
+    "PATH": "/Users/zekailin00/.local/bin:/usr/local/bin:/opt/homebrew/opt/ruby/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Applications/Blender.app/Contents/MacOS:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/pmk/env/global/bin:/opt/X11/bin:/Library/Apple/usr/bin:/Library/TeX/texbin:/usr/local/share/dotnet:~/.dotnet/tools:/Library/Frameworks/Mono.framework/Versions/Current/Commands:/Applications/Postgres.app/Contents/Versions/latest/bin",
+    "PDD_PATH": "/Users/zekailin00/.local/share/uv/tools/pdd-cli/lib/python3.12/site-packages/pdd"
+  },
+  "file_contents": {
+    "/Users/zekailin00/.pdd/llm_model.csv": "provider,model,input,output,coding_arena_elo,model_rank_score,model_rank_source,base_url,api_key,max_reasoning_tokens,structured_output,reasoning_type,location,interactive_only,context_limit\nOpenAI ChatGPT,chatgpt/gpt-5.6-sol,0.0,0.0,0,17001,platform-default,,,0,True,none,,True,\nOpenAI ChatGPT,chatgpt/gpt-5.5,0.0,0.0,1450,17000,deepswe-solve-rate,,,0,True,none,,True,\nOpenAI ChatGPT,chatgpt/gpt-5.4,0.0,0.0,1437,15600,deepswe-solve-rate,,,0,True,none,,True,\nOpenAI ChatGPT,chatgpt/gpt-5.3-codex,0.0,0.0,1407,1407,arena-elo-fallback,,,0,True,none,,True,\nOpenAI ChatGPT,chatgpt/gpt-5.2,0.0,0.0,1404,1404,arena-elo-fallback,,,0,True,none,,True,\nOpenAI ChatGPT,chatgpt/gpt-5.3-codex-spark,0.0,0.0,1400,1400,static,,,0,True,none,,True,\n"
+  },
+  "terminal_output": "=== STDOUT ===\nChecking for updates...\nShell completion already installed for zsh.\n\n--- Command Execution Summary ---\n  Context compression: off; fallback policy: full\n-------------------------------------\n"
+}
