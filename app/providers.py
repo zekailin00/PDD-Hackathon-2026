@@ -19,7 +19,9 @@ PROVIDERS = {
     "tokenrouter": {
         "label": "TokenRouter",
         "url": "https://api.tokenrouter.com/v1/messages",
-        "default_model": "claude-opus-4-20250514",
+        # TokenRouter namespaces models by vendor; a bare Anthropic model id
+        # is not recognised here.
+        "default_model": "anthropic/claude-opus-5",
         "key_hint": "tr-...",
         "console": "https://www.tokenrouter.com/console/token",
     },

@@ -21,7 +21,8 @@ import httpx
 from . import hub, keys, memory, providers, repo_reader, state
 
 ANTHROPIC_VERSION = "2023-06-01"
-MAX_STEPS = 10
+MAX_STEPS = 8
+MAX_TOOL_RESULT = 12_000     # chars; whole files pile up in context otherwise
 FLUSH_INTERVAL = 0.06        # seconds between token broadcasts
 HALT_CHECK_EVERY = 40        # deltas between mid-stream halt checks
 
@@ -40,6 +41,16 @@ Rules of the room:
 - Messages tagged [STEER from ...] arrive mid-run. Treat them as corrections
   to your current direction and acknowledge what changed.
 - Prefer one small, reviewable, well-scoped patch over a sprawling one.
+
+How to spend a run:
+- You get a small number of steps. Read only what you actually need -- one or
+  two files, not the whole repository. Every file you read stays in context and
+  crowds out the work.
+- Do not re-read a file you have already read.
+- Call propose_patch as soon as you know what the change is. A small patch the
+  room can approve beats a perfect one that never arrives.
+- If you reach your second-to-last step without proposing, propose your best
+  current answer and say what you were unsure about.
 """
 
 TOOLS = [
@@ -315,9 +326,15 @@ async def run_agent(room: state.Room, run_id: str, model: str | None = None) -> 
                                     "content": s.content} for s in pending],
                     })
 
+                left = MAX_STEPS - step
+                if left <= 2:
+                    messages.append({"role": "user", "content":
+                        f"[{left} step(s) left in this run. Call propose_patch now "
+                        "with your best current answer.]"})
+
                 run.steps.append({"step": step, "label": "thinking"})
                 hub.publish(room.id, "step", {"run_id": run_id, "step": step,
-                                              "label": "thinking"})
+                                              "label": f"step {step + 1} of {MAX_STEPS}"})
 
                 text, tool_calls, halted = await _stream_step(
                     client, entry["key"], endpoint, model, messages, room, run
@@ -352,10 +369,14 @@ async def run_agent(room: state.Room, run_id: str, model: str | None = None) -> 
                         room, run_id, call["name"], call["input"]
                     )
                     stop = stop or should_stop
+                    if len(out) > MAX_TOOL_RESULT:
+                        out = (out[:MAX_TOOL_RESULT]
+                               + f"\n\n[truncated: {len(out) - MAX_TOOL_RESULT} more chars. "
+                                 "Use search() to find a specific line instead of re-reading.]")
                     results.append({
                         "type": "tool_result",
                         "tool_use_id": call["id"],
-                        "content": out[:100_000],
+                        "content": out,
                     })
                 messages.append({"role": "user", "content": results})
                 if stop:
