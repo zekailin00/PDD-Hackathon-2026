@@ -1,7 +1,7 @@
-# co-prompt
+# CoPrompt
 
 Prompt-driven development is still usually one driver and several reviewers.
-co-prompt adds the missing multiplayer control layer: a shared intent document,
+CoPrompt adds the missing multiplayer control layer: a shared intent document,
 role lanes, live execution, checkpoint steering, room approval, and export to a
 real PDD Issue.
 

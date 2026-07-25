@@ -75,6 +75,11 @@ export type Room = {
   visibility: RoomVisibility;
   systemPrompt: string;
   preferredModel?: string;
+  sourceArchive?: {
+    name: string;
+    fileCount: number;
+    truncated: boolean;
+  };
   isDemo?: boolean;
   state: RoomState;
   intent: string;

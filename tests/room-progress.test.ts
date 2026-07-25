@@ -115,7 +115,7 @@ describe("room progress", () => {
     const roomId = room();
     const run = startRun(roomId, "u-amy", "cheap");
     addMessage(roomId, {
-      authorName: "co-prompt agent", userId: "agent", role: "agent",
+      authorName: "CoPrompt agent", userId: "agent", role: "agent",
       kind: "agent", content: "thinking", runId: run.id,
     });
 

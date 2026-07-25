@@ -1,5 +1,5 @@
 {
-  "name": "co-prompt",
+  "name": "coprompt",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -11,10 +11,13 @@
     "test:watch": "vitest",
     "check": "npm run typecheck && npm test && npm run build"
   },
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
     "@radix-ui/themes": "^3.2.1",
     "@supabase/supabase-js": "^2.110.8",
+    "fflate": "^0.8.3",
     "next": "^15.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

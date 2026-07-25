@@ -1,4 +1,4 @@
-/* co-prompt — retro workshop
+/* CoPrompt — retro workshop
  *
  * Mid-century palette: burnt orange, mustard, avocado, cherry. Thick slab
  * lettering, hard offset shadows instead of blur, checkerboard and starburst
@@ -20,11 +20,43 @@
   --cherry: #c1272d;
   --teal: #2e7d78;
   --brown: #6b4423;
+  --reply: #fff4e3;
+  --steer: #ffeccd;
+  --approval: #eef2dc;
+  --screen: #2b1810;
+  --grid-dot: rgba(43, 24, 16, .09);
+  --pattern: rgba(43, 24, 16, .12);
+  --placeholder: rgba(90, 64, 48, .62);
+  --shadow-color: var(--ink);
 
-  --shadow: 4px 4px 0 var(--ink);
-  --shadow-sm: 2px 2px 0 var(--ink);
+  --shadow: 4px 4px 0 var(--shadow-color);
+  --shadow-sm: 2px 2px 0 var(--shadow-color);
   --border: 3px solid var(--ink);
   --border-thin: 2px solid var(--ink);
+}
+
+html[data-theme-mode="dark"],
+.radix-themes[data-theme-mode="dark"] {
+  --cream: #17110d;
+  --cream-2: #211812;
+  --paper: #2b2018;
+  --ink: #f5dfbb;
+  --ink-2: #d8bb91;
+  --orange: #f06c25;
+  --mustard: #d9a52d;
+  --avocado: #91a858;
+  --cherry: #db4f55;
+  --teal: #50aaa3;
+  --brown: #d5a975;
+  --reply: #3a281b;
+  --steer: #3b2b18;
+  --approval: #28301d;
+  --screen: #0d0b09;
+  --grid-dot: rgba(245, 223, 187, .07);
+  --pattern: rgba(13, 11, 9, .22);
+  --placeholder: rgba(216, 187, 145, .68);
+  --shadow-color: #070504;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -37,7 +69,7 @@ body {
   font-weight: 500;
   /* Wallpaper: a soft dot grid over warm paper. */
   background-image:
-    radial-gradient(circle at 1px 1px, rgba(43, 24, 16, .09) 1px, transparent 0);
+    radial-gradient(circle at 1px 1px, var(--grid-dot) 1px, transparent 0);
   background-size: 18px 18px;
 }
 
@@ -70,8 +102,8 @@ body {
   background: var(--mustard);
   /* Checkerboard skirt along the bottom edge. */
   background-image:
-    linear-gradient(45deg, rgba(43,24,16,.12) 25%, transparent 25%, transparent 75%, rgba(43,24,16,.12) 75%),
-    linear-gradient(45deg, rgba(43,24,16,.12) 25%, transparent 25%, transparent 75%, rgba(43,24,16,.12) 75%);
+    linear-gradient(45deg, var(--pattern) 25%, transparent 25%, transparent 75%, var(--pattern) 75%),
+    linear-gradient(45deg, var(--pattern) 25%, transparent 25%, transparent 75%, var(--pattern) 75%);
   background-size: 22px 22px;
   background-position: 0 0, 11px 11px;
   background-repeat: repeat-x;
@@ -80,17 +112,11 @@ body {
 .topbar > div:last-child { justify-content: flex-end; }
 .topbar .rt-Heading { font-family: Bungee, sans-serif; color: var(--ink); }
 
-.brand-mark, .welcome-logo {
-  display: grid;
-  place-items: center;
+.brand-icon {
+  flex: 0 0 auto;
   width: 38px;
   height: 38px;
-  border: var(--border);
-  border-radius: 50%;
-  background: var(--orange);
-  color: var(--paper);
-  font-size: 20px;
-  box-shadow: var(--shadow-sm);
+  object-fit: contain;
 }
 
 .presence-avatar { position: relative; display: inline-flex; }
@@ -125,6 +151,12 @@ body {
 .intent-panel   { border-right: var(--border); background: var(--cream-2); }
 .run-panel      { border-right: var(--border); background: var(--paper); }
 .artifact-panel { background: var(--cream-2); }
+.artifact-panel > .rt-TabsRoot {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 
 /* Section eyebrows read like machine labels. */
 .intent-panel .rt-Text[data-accent-color="gray"],
@@ -194,14 +226,14 @@ body {
 .room-message .rt-Text[size="1"] { color: var(--brown) !important; }
 
 /* A reply is the room's newer position on a point — mark it. */
-.room-message.is-reply { border-left-color: var(--orange); background: #fff4e3; }
+.room-message.is-reply { border-left-color: var(--orange); background: var(--reply); }
 .room-message.by-agent { border-left-color: var(--mustard); }
 
 .thread-quote {
   margin: 4px 0 2px;
   padding: 4px 8px;
   border-left: 3px solid var(--brown);
-  background: rgba(107, 68, 35, .09);
+  background: var(--grid-dot);
   color: var(--ink-2);
   font-size: 11px;
   font-style: italic;
@@ -225,7 +257,7 @@ body {
   overflow: auto;
   border: var(--border);
   border-radius: 8px;
-  background: var(--ink);
+  background: var(--screen);
   box-shadow: var(--shadow);
 }
 
@@ -249,7 +281,7 @@ body {
 
 .generated-code {
   min-height: 100%;
-  background: var(--ink);
+  background: var(--screen);
   color: #7dd88f !important;
 }
 
@@ -264,7 +296,7 @@ body {
   box-shadow: var(--shadow);
 }
 
-.steer-box { background: #ffeccd !important; border-color: var(--orange) !important; }
+.steer-box { background: var(--steer) !important; border-color: var(--orange) !important; }
 .steer-box .rt-Text { color: var(--ink) !important; }
 
 /* ------------------------------------------------------------ progress -- */
@@ -304,7 +336,7 @@ body {
   border: var(--border-thin);
   border-radius: 3px;
   background:
-    repeating-linear-gradient(90deg, transparent 0 9px, rgba(43,24,16,.12) 9px 10px),
+    repeating-linear-gradient(90deg, transparent 0 9px, var(--pattern) 9px 10px),
     var(--cream);
   overflow: hidden;
 }
@@ -384,7 +416,7 @@ body {
 
 .radix-themes .rt-Button:hover:not(:disabled) {
   transform: translate(-1px, -1px);
-  box-shadow: 3px 3px 0 var(--ink);
+  box-shadow: 3px 3px 0 var(--shadow-color);
 }
 .radix-themes .rt-Button:active:not(:disabled) {
   transform: translate(2px, 2px);
@@ -451,12 +483,79 @@ body {
 
 .radix-themes .rt-TextFieldInput { color: var(--ink) !important; }
 .radix-themes input::placeholder,
-.radix-themes textarea::placeholder { color: rgba(90, 64, 48, .62) !important; }
+.radix-themes textarea::placeholder { color: var(--placeholder) !important; }
+
+.field-group { min-width: 0; }
+.field-label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.zip-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.zip-picker {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 9px 12px;
+  overflow: hidden;
+  border: var(--border-thin);
+  border-radius: 5px;
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+  font: 700 12px/1.4 "Space Mono", monospace;
+  cursor: pointer;
+}
+
+.zip-picker span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zip-input:focus-visible + .zip-picker {
+  outline: 3px solid var(--orange);
+  outline-offset: 2px;
+}
+
 .radix-themes .rt-SelectContent {
   border: var(--border) !important;
   border-radius: 6px !important;
   background: var(--paper) !important;
+  color: var(--ink) !important;
   box-shadow: var(--shadow);
+}
+
+/* 下拉選單會渲染在 portal；明確指定每一層顏色，避免瀏覽器或 Radix
+ * 的深色預設樣式造成黑底黑字。 */
+.radix-themes .rt-SelectViewport,
+.radix-themes .rt-SelectItem {
+  background: var(--paper) !important;
+  color: var(--ink) !important;
+}
+
+.radix-themes .rt-SelectItem[data-highlighted] {
+  background: var(--orange) !important;
+  color: var(--paper) !important;
+  outline: none;
+}
+
+.radix-themes .rt-SelectItemIndicator,
+.radix-themes .rt-SelectScrollButton {
+  color: currentColor !important;
 }
 
 .radix-themes .rt-TabsList {
@@ -483,14 +582,16 @@ body {
 /* ------------------------------------------------------------- artifact -- */
 
 .artifact-body {
-  height: min(44vh, 480px);
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   border: var(--border);
   border-radius: 0 8px 8px 8px;
   background: var(--paper);
   box-shadow: var(--shadow);
 }
-.artifact-body iframe { width: 100%; height: min(44vh, 480px); border: 0; background: #fff; }
+.artifact-body .rt-TabsContent { height: 100%; }
+.artifact-body iframe { width: 100%; height: 100%; border: 0; background: #fff; }
 
 .empty {
   display: grid;
@@ -501,11 +602,12 @@ body {
 }
 .empty .rt-Text { color: var(--brown) !important; font-style: italic; }
 
-.approval-box { margin-top: auto; background: #eef2dc !important; border-color: var(--avocado) !important; }
+.approval-box { margin-top: auto; background: var(--approval) !important; border-color: var(--avocado) !important; }
 
 /* -------------------------------------------------------------- welcome -- */
 
 .welcome {
+  position: relative;
   display: grid;
   min-height: 100vh;
   place-items: center;
@@ -514,8 +616,8 @@ body {
   /* Starburst sunrise, the way a 70s book jacket would do it. */
   background-image:
     repeating-conic-gradient(from 0deg at 50% 0%,
-      rgba(217, 79, 4, .11) 0deg 7deg, transparent 7deg 14deg),
-    radial-gradient(circle at 1px 1px, rgba(43, 24, 16, .08) 1px, transparent 0);
+      color-mix(in srgb, var(--orange) 11%, transparent) 0deg 7deg, transparent 7deg 14deg),
+    radial-gradient(circle at 1px 1px, var(--grid-dot) 1px, transparent 0);
   background-size: 100% 100%, 18px 18px;
 }
 
@@ -525,7 +627,7 @@ body {
   border: var(--border) !important;
   border-radius: 12px !important;
   background: var(--paper) !important;
-  box-shadow: 8px 8px 0 var(--ink);
+  box-shadow: 8px 8px 0 var(--shadow-color);
 }
 .welcome-card-wide { width: min(100%, 680px); }
 
@@ -536,7 +638,41 @@ body {
   color: var(--ink);
 }
 .welcome-card .rt-Text { color: var(--ink-2); }
-.welcome-logo { width: 50px; height: 50px; margin-bottom: 20px; font-size: 26px; }
+.welcome-lockup-frame {
+  margin-bottom: 20px;
+  padding: 10px 14px;
+  overflow: hidden;
+  border: var(--border);
+  border-radius: 10px;
+  background: #fffaf0;
+  box-shadow: var(--shadow-sm);
+}
+
+.welcome-lockup {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.welcome-preferences {
+  position: absolute;
+  top: 20px;
+  right: 22px;
+  z-index: 2;
+}
+
+.preference-controls { white-space: nowrap; }
 
 /* ----------------------------------------------------------- responsive -- */
 
@@ -555,5 +691,8 @@ body {
   .run-panel { min-height: calc(100vh - 72px); border-right: 0; }
   .topbar { grid-template-columns: 1fr auto; padding: 0 12px; }
   .topbar > div:nth-child(2) { display: none; }
-  .welcome-card { box-shadow: 5px 5px 0 var(--ink); }
+  .topbar .presence-avatar { display: none; }
+  .preference-controls.is-compact .rt-Button { padding-inline: 7px; }
+  .welcome-card { box-shadow: 5px 5px 0 var(--shadow-color); }
+  .welcome-preferences { top: 12px; right: 12px; }
 }
