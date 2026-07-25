@@ -1,0 +1,14 @@
+% token_split — charge one shared run back to participants deterministically
+
+# Module: token-split
+
+Create a pure TypeScript module exporting `splitTokens(totalTokens, contributions, mode)`.
+`contributions` contains `{userId: string, weight: number}` and mode is
+`weighted | equal | initiator`.
+
+MUST conserve every token exactly, return non-negative integers, combine repeated
+users, handle an empty list, fall back to equal when all weights are zero, and
+break fractional remainders by fraction descending then userId ascending.
+`initiator` charges the first contribution's user and emits zero for all others.
+Reject negative/non-integer totals, invalid weights, and unknown modes. Do not
+mutate input or perform I/O. Tests must cover 100 split three ways as 34/33/33.

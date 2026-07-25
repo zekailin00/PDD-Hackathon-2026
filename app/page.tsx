@@ -2,178 +2,215 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Avatar, Badge, Box, Button, Callout, Card, Dialog, Flex, Heading, IconButton,
-  Select, Separator, Text, TextArea, TextField, Theme,
+  Avatar, Badge, Box, Button, Card, Flex, Heading, Select, Separator, Tabs, Text, TextArea, TextField, Theme,
 } from "@radix-ui/themes";
+import type { Artifact, Room, RoomEvent } from "@/lib/domain";
+import type { Difficulty } from "@/pdd/model-router";
+import type { Role } from "@/pdd/role-policy";
 
-type FileItem = { path: string; content: string };
-type Message = { id: string; author: string; initials: string; createdAt: string; body: string; role: "user" | "assistant"; changed?: string[] };
-type Provider = { name: string; model: string; baseUrl: string; apiKey: string };
-type Room = { id: string; name: string; userName: string; systemPrompt: string; files: FileItem[]; messages: Message[]; provider: Provider; updatedAt: number; agentRunning?: boolean };
+const identityKey = "coprompt:identity";
+const newId = () => crypto.randomUUID();
+const roleColor: Record<Role, "indigo" | "orange" | "pink" | "green" | "gray"> = {
+  pm: "indigo", eng: "orange", design: "pink", qa: "green", observer: "gray",
+};
 
-const ROOM_KEY = "co-prompt:room:";
-const TOKENROUTER_BASE_URL = "https://api.tokenrouter.com/v1";
-const defaultFiles: FileItem[] = [
-  { path: "app/page.tsx", content: `export default function Home() {\n  return (\n    <main>\n      <h1>Acme</h1>\n      <p>Thoughtful products for ambitious teams.</p>\n    </main>\n  );\n}\n` },
-  { path: "app/globals.css", content: `@import "tailwindcss";\n\n:root {\n  --background: #101114;\n  --foreground: #f8f8fa;\n}\n\nbody {\n  background: var(--background);\n  color: var(--foreground);\n}\n` },
-  { path: "components/Hero.tsx", content: `export function Hero() {\n  return <section className="hero">Build together, faster.</section>;\n}\n` },
-  { path: "package.json", content: `{\n  "name": "acme-landing",\n  "private": true,\n  "scripts": { "dev": "next dev" },\n  "dependencies": { "next": "latest", "react": "latest" }\n}\n` },
-];
-
-const now = () => new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-const id = () => Math.random().toString(36).slice(2, 9);
-
-function newRoom(name: string, userName: string, roomId: string): Room {
-  return {
-    id: roomId, name: name || "Untitled project", userName, files: defaultFiles,
-    systemPrompt: "You are the project agent. This is a TypeScript Next.js web project. Explain your plan briefly, then only modify files when a user clearly asks for a change. Preserve the existing design and use the project’s current dependencies.",
-    provider: { name: "TokenRouter", model: "", baseUrl: TOKENROUTER_BASE_URL, apiKey: "" },
-    messages: [{ id: id(), author: "co-prompt", initials: "✦", createdAt: now(), role: "assistant", body: "Room ready. Tell me about the project, ask a question, or ask me to modify the code." }],
-    updatedAt: Date.now(),
-  };
-}
-
-function basename(path: string) { return path.split("/").at(-1) || path; }
-function mergeFiles(current: FileItem[], updates: FileItem[]) {
-  const next = new Map(current.map(file => [file.path, file]));
-  updates.forEach(file => next.set(file.path, file));
-  return [...next.values()];
-}
+type Identity = { userId: string; name: string; role: Role };
 
 export default function Home() {
+  const [identity, setIdentity] = useState<Identity | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
-  const [roomName, setRoomName] = useState("Acme landing page");
-  const [userName, setUserName] = useState("");
-  const [draft, setDraft] = useState("");
-  const [activeFile, setActiveFile] = useState("app/page.tsx");
-  const [running, setRunning] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [systemOpen, setSystemOpen] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
-  const [changesOpen, setChangesOpen] = useState(false);
-  const [lastChange, setLastChange] = useState<string[]>([]);
-  const [githubToken, setGithubToken] = useState("");
-  const [githubRepo, setGithubRepo] = useState("");
-  const [publishing, setPublishing] = useState(false);
-  const [publishedUrl, setPublishedUrl] = useState("");
-  const channel = useRef<BroadcastChannel | null>(null);
+  const [token, setToken] = useState("");
+  const [name, setName] = useState("");
+  const [role, setRole] = useState<Role>("pm");
+  const [title, setTitle] = useState("Collaborative product room");
+  const [roomCode, setRoomCode] = useState("");
+  const [intentDraft, setIntentDraft] = useState("");
+  const [prompt, setPrompt] = useState("");
+  const [steer, setSteer] = useState("");
+  const [chatDraft, setChatDraft] = useState("");
+  const [replyTo, setReplyTo] = useState("");
+  const [difficulty, setDifficulty] = useState<Difficulty>("standard");
+  const [liveOutput, setLiveOutput] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const lastRoomId = useRef("");
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const roomId = params.get("room");
-    if (roomId) {
-      const stored = localStorage.getItem(`${ROOM_KEY}${roomId}`);
-      if (stored) setRoom(JSON.parse(stored) as Room);
-      fetch(`/api/rooms?id=${encodeURIComponent(roomId)}`).then(response => response.ok ? response.json() : null).then(value => value && setRoom(current => ({ ...value, userName: current?.userName || "Anonymous", provider: { ...value.provider, apiKey: current?.provider.apiKey || "" } }))).catch(() => undefined);
+    const stored = localStorage.getItem(identityKey);
+    if (stored) {
+      const parsed = JSON.parse(stored) as Identity;
+      setName(parsed.name); setRole(parsed.role);
     }
-    channel.current = new BroadcastChannel("co-prompt-room");
-    channel.current.onmessage = event => setRoom(event.data as Room);
-    return () => channel.current?.close();
+    setRoomCode(new URLSearchParams(window.location.search).get("room") || "");
   }, []);
 
   useEffect(() => {
-    if (!room) return;
-    localStorage.setItem(`${ROOM_KEY}${room.id}`, JSON.stringify(room));
-    channel.current?.postMessage(room);
-    const sharedRoom = { ...room, provider: { ...room.provider, apiKey: "" } };
-    void fetch("/api/rooms", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sharedRoom) });
-  }, [room]);
-
-  const file = useMemo(() => room?.files.find(item => item.path === activeFile) ?? room?.files[0], [room, activeFile]);
-  const agentBusy = running || Boolean(room?.agentRunning);
-  useEffect(() => {
-    if (!room) return;
-    const poll = window.setInterval(() => fetch(`/api/rooms?id=${encodeURIComponent(room.id)}`).then(response => response.ok ? response.json() : null).then(value => value && setRoom(current => !current || value.updatedAt <= current.updatedAt ? current : { ...value, userName: current.userName, provider: { ...value.provider, apiKey: current.provider.apiKey } })).catch(() => undefined), 2500);
-    return () => window.clearInterval(poll);
+    if (!room || room.id === lastRoomId.current) return;
+    lastRoomId.current = room.id;
+    const events = new EventSource(`/api/rooms/${room.id}/events`);
+    events.onmessage = (event) => {
+      const value = JSON.parse(event.data) as RoomEvent;
+      if (value.type === "snapshot") {
+        setRoom(value.room);
+        setIntentDraft(value.room.intent);
+      } else if (value.type === "token") {
+        setLiveOutput((current) => current + value.chunk);
+      } else if (value.type === "step") {
+        setNotice(`Step ${value.step}: ${value.label}`);
+      } else if (value.type === "steer_applied") {
+        setNotice(`⚡ 已套用 ${value.steers.length} 則導引`);
+      } else if (value.type === "halted") {
+        setNotice(`${value.by} 已中止執行`);
+      } else if (value.type === "error") {
+        setNotice(value.message);
+      }
+    };
+    return () => { events.close(); lastRoomId.current = ""; };
   }, [room?.id]);
-  const enterRoom = () => {
-    const next = newRoom(roomName, userName.trim() || "Anonymous", id());
-    window.history.replaceState({}, "", `?room=${next.id}`);
-    setRoom(next); setActiveFile(next.files[0].path);
+
+  const join = async () => {
+    const nextIdentity = { userId: identity?.userId || newId(), name: name.trim() || "Anonymous", role };
+    const response = await fetch("/api/rooms", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roomId: roomCode || undefined, title, ...nextIdentity }),
+    });
+    const data = await response.json();
+    if (!response.ok) return setNotice(data.error);
+    localStorage.setItem(identityKey, JSON.stringify(nextIdentity));
+    setIdentity(nextIdentity); setToken(data.token); setRoom(data.room); setIntentDraft(data.room.intent);
+    window.history.replaceState({}, "", `?room=${data.room.id}`);
   };
-  const updateRoom = (update: Partial<Room>) => setRoom(current => current ? { ...current, ...update, updatedAt: Date.now() } : current);
-  const exportProject = () => {
+
+  const authorized = (body?: unknown) => ({
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+  const saveIntent = async () => {
     if (!room) return;
-    const blob = new Blob([JSON.stringify({ name: room.name, files: room.files }, null, 2)], { type: "application/json" });
-    const href = URL.createObjectURL(blob); const anchor = document.createElement("a");
-    anchor.href = href; anchor.download = `${room.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "project"}.co-prompt.json`; anchor.click(); URL.revokeObjectURL(href);
-    setExportOpen(false);
+    const response = await fetch(`/api/rooms/${room.id}`, {
+      method: "PATCH", headers: authorized().headers, body: JSON.stringify({ intent: intentDraft }),
+    });
+    const data = await response.json();
+    setNotice(response.ok ? "共同意圖已同步" : data.error);
   };
-  const publishGitHub = async () => {
-    if (!room || !githubToken.trim() || !githubRepo.trim()) return;
-    setPublishing(true); setPublishedUrl("");
+
+  const run = async () => {
+    if (!room || !prompt.trim()) return;
+    setBusy(true); setLiveOutput(""); setNotice("正在啟動 TokenRouter auto…");
     try {
-      const response = await fetch("/api/github", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: githubToken.trim(), repository: githubRepo.trim(), files: room.files }) });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "GitHub publish failed.");
-      setPublishedUrl(result.url);
-    } catch (error) { setPublishedUrl(error instanceof Error ? error.message : "GitHub publish failed."); }
-    finally { setPublishing(false); }
+      const response = await fetch("/api/agent", authorized({ roomId: room.id, prompt, difficulty }));
+      const data = await response.text();
+      if (!response.ok) {
+        const parsed = JSON.parse(data);
+        setNotice(parsed.error);
+      }
+    } finally {
+      setBusy(false);
+    }
   };
-  const send = async () => {
-    if (!room || !draft.trim() || agentBusy) return;
-    const prompt = draft.trim();
-    const message: Message = { id: id(), author: room.userName, initials: room.userName.slice(0, 2).toUpperCase(), createdAt: now(), role: "user", body: prompt };
-    updateRoom({ messages: [...room.messages, message], agentRunning: true }); setDraft("");
-    setRunning(true);
-    try {
-      if (!room.provider.apiKey || !room.provider.baseUrl || !room.provider.model) throw new Error("Connect an AI provider, add an API key, and select a model before chatting with the agent.");
-      const provider = room.provider.name === "TokenRouter" ? { ...room.provider, baseUrl: TOKENROUTER_BASE_URL } : room.provider;
-      const response = await fetch("/api/agent", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider, systemPrompt: room.systemPrompt, prompt, files: room.files }) });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "The configured provider could not complete the request.");
-      const changed = result.action === "edit" ? (result.files as FileItem[]).map(item => item.path) : [];
-      const files = result.action === "edit" ? mergeFiles(room.files, result.files as FileItem[]) : room.files;
-      setLastChange(changed);
-      setRoom(current => current ? { ...current, files, agentRunning: false, messages: [...current.messages, { id: id(), author: "co-prompt agent", initials: "✦", createdAt: now(), role: "assistant", body: result.message, ...(changed.length ? { changed } : {}) }], updatedAt: Date.now() } : current);
-    } catch (error) {
-      setRoom(current => current ? { ...current, agentRunning: false, messages: [...current.messages, { id: id(), author: "co-prompt agent", initials: "✦", createdAt: now(), role: "assistant", body: error instanceof Error ? error.message : "Agent request failed." }] } : current);
-    } finally { setRunning(false); }
+
+  const sendSteer = async (kind: "nudge" | "halt") => {
+    const runId = [...(room?.runs || [])].reverse().find((item) => item.status === "running")?.id;
+    if (!room || !runId) return setNotice("目前沒有執行中的 run");
+    const response = await fetch(`/api/rooms/${room.id}/steers`, authorized({ runId, kind, content: steer }));
+    const data = await response.json();
+    setNotice(response.ok ? `${kind.toUpperCase()} 已排入下一個檢查點` : data.error);
+    if (response.ok) setSteer("");
+  };
+
+  const sendMessage = async () => {
+    if (!room || !chatDraft.trim()) return;
+    const response = await fetch(`/api/rooms/${room.id}/messages`, authorized({
+      content: chatDraft,
+      replyTo: replyTo || undefined,
+      kind: room.state === "AWAITING_INPUT" ? "answer" : "prompt",
+    }));
+    const data = await response.json();
+    setNotice(response.ok ? "訊息已同步" : data.error);
+    if (response.ok) { setChatDraft(""); setReplyTo(""); }
+  };
+
+  const vote = async (verdict: "approve" | "request_changes") => {
+    const runId = [...(room?.runs || [])].reverse().find((item) => item.status === "proposed")?.id;
+    if (!room || !runId) return setNotice("目前沒有待審提案");
+    const response = await fetch(`/api/rooms/${room.id}/votes`, authorized({ runId, verdict }));
+    const data = await response.json();
+    setNotice(response.ok ? data.quorum.reason : data.error);
+  };
+
+  const exportIssue = async () => {
+    if (!room) return;
+    const response = await fetch(`/api/rooms/${room.id}/export`, authorized({}));
+    const data = await response.json();
+    if (response.ok) window.open(data.url, "_blank", "noopener,noreferrer");
+    else setNotice(data.error);
   };
 
   return <Theme appearance="dark" accentColor="indigo" grayColor="slate" radius="large">
-    {!room ? <Welcome roomName={roomName} setRoomName={setRoomName} userName={userName} setUserName={setUserName} enterRoom={enterRoom} /> :
+    {!room || !identity ? <Welcome {...{ name, setName, role, setRole, title, setTitle, roomCode, setRoomCode, join, notice }} /> :
       <main className="app-shell">
-        <header className="topbar"><Flex align="center" gap="3"><Box className="brand-mark">⌘</Box><Heading size="3">co-prompt</Heading><Badge color="gray">shared room</Badge></Flex><Flex align="center" gap="3"><Text size="2" weight="medium"><span className="green-dot" /> {room.name}</Text><Badge color="green" variant="soft">{room.id}</Badge></Flex><Flex justify="end" align="center" gap="2"><Avatar fallback={room.userName.slice(0, 2).toUpperCase()} color="indigo" size="2" /><Button size="2" variant="soft" onClick={() => navigator.clipboard.writeText(window.location.href)}>Copy room link</Button><Button size="2" onClick={() => setExportOpen(true)}>Save project</Button><IconButton variant="soft" onClick={() => setSettingsOpen(true)}>⚙</IconButton></Flex></header>
-        <section className="workspace">
-          <aside className="sidebar"><Flex justify="between" align="center" mb="3"><Text size="1" color="gray" weight="bold">PROJECT FILES</Text><IconButton size="1" variant="ghost" onClick={() => setSystemOpen(true)}>✦</IconButton></Flex><nav className="file-list">{room.files.map(item => <Button key={item.path} variant={item.path === file?.path ? "soft" : "ghost"} color={item.path === file?.path ? "indigo" : "gray"} className="file-button" onClick={() => setActiveFile(item.path)}><span>{item.path.endsWith(".json") ? "{}" : item.path.endsWith(".css") ? "#" : "◇"}</span>{item.path}</Button>)}</nav><Box className="sidebar-footer"><Text size="1" color="gray">Only the agent can modify files. Room changes sync through this app instance; your API key stays in your browser.</Text></Box></aside>
-          <section className="editor-panel"><Flex className="editor-head" align="center" justify="between"><Text size="2" weight="medium">{file?.path}</Text><Badge color="gray" variant="soft">read-only</Badge></Flex><Box className="code-area">{file?.content.split("\n").map((line, index) => <div className="code-line" key={`${index}-${line}`}><span className="line-number">{index + 1}</span><code>{line || " "}</code></div>)}</Box><Flex className="editor-status" justify="between"><Text size="1">main · synced</Text><Text size="1">TypeScript · UTF-8</Text></Flex></section>
-          <section className="chat-panel"><Flex className="chat-header" align="center" justify="between"><Box><Heading size="3">Room chat</Heading><Text size="1" color="gray"><span className="green-dot" /> {agentBusy ? "Agent is working" : "Ready to collaborate"}</Text></Box><Badge color={agentBusy ? "amber" : "green"}>{agentBusy ? "locked" : "live"}</Badge></Flex><Box className="messages">{room.messages.map(message => <Flex key={message.id} className={`message ${message.role}`} gap="2"><Avatar fallback={message.initials} color={message.role === "assistant" ? "indigo" : "orange"} size="2" /><Box><Flex gap="2" align="baseline"><Text size="2" weight="bold">{message.author}</Text><Text size="1" color="gray">{message.createdAt}</Text></Flex><Text as="p" size="2">{message.body}</Text>{message.changed && <Card className="change-card"><Flex justify="between" align="center"><Box><Text size="2" weight="bold">Modified {message.changed.length} file</Text><Text as="p" size="1" color="gray">{message.changed.join(", ")}</Text></Box><Button size="1" variant="soft" onClick={() => { setLastChange(message.changed || []); setChangesOpen(true); }}>Review</Button></Flex></Card>}</Box></Flex>)}</Box>{agentBusy && <Callout.Root className="working"><Callout.Text>Agent is modifying the project. Sending is temporarily locked for everyone.</Callout.Text></Callout.Root>}<Box className="composer"><TextArea value={draft} onChange={e => setDraft(e.target.value)} disabled={agentBusy} placeholder={agentBusy ? "Agent is modifying the project…" : "Ask about the project or request a code change…"} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send(); } }} /><Flex justify="between" align="center" mt="2"><Text size="1" color="gray">Enter to send · Shift+Enter for a new line</Text><Button size="1" disabled={!draft.trim() || agentBusy} onClick={() => void send()}>{agentBusy ? "Working…" : "Send to agent"}</Button></Flex></Box></section>
+        <header className="topbar">
+          <Flex align="center" gap="3"><Box className="brand-mark">⌘</Box><Heading size="3">co-prompt</Heading><Badge color="indigo">PDD multiplayer</Badge></Flex>
+          <Flex align="center" gap="2"><Badge color={room.state === "RUNNING" ? "amber" : room.state === "PROPOSED" ? "violet" : "green"}>{room.state}</Badge><Text size="2">{room.title}</Text></Flex>
+          <Flex justify="end" align="center" gap="2">{room.participants.slice(0, 5).map((person) => <Avatar key={person.userId} fallback={person.name.slice(0, 2).toUpperCase()} color={roleColor[person.role]} size="2" title={`${person.name} · ${person.role}`} />)}<Badge color={roleColor[identity.role]}>{identity.role.toUpperCase()}</Badge></Flex>
+        </header>
+
+        <section className="ensemble-grid">
+          <section className="intent-panel">
+            <Flex justify="between" align="center"><Box><Text size="1" color="gray" weight="bold">PROMPT CAPITAL</Text><Heading size="4">共同意圖文件</Heading></Box><Button size="1" variant="soft" onClick={saveIntent} disabled={room.state === "RUNNING"}>同步</Button></Flex>
+            <TextArea className="intent-editor" value={intentDraft} onChange={(event) => setIntentDraft(event.target.value)} disabled={room.state === "RUNNING"} />
+            <Separator size="4" />
+            <Text size="1" color="gray" weight="bold">ROOM CHAT</Text>
+            <Box className="room-messages">{room.messages.slice(-12).map((message) => <Box key={message.id} className="room-message"><Flex justify="between"><Text size="1" weight="bold">{message.authorName} · {message.role.toUpperCase()}</Text><Button size="1" variant="ghost" onClick={() => setReplyTo(message.id)}>回覆</Button></Flex>{message.replyTo && <Text size="1" color="gray">↳ thread {message.replyTo.slice(0, 6)}</Text>}<Text as="p" size="2">{message.content}</Text></Box>)}</Box>
+            <Box className="chat-compose">{replyTo && <Flex justify="between"><Text size="1" color="gray">回覆 thread {replyTo.slice(0, 6)}</Text><Button size="1" variant="ghost" onClick={() => setReplyTo("")}>取消</Button></Flex>}<TextArea value={chatDraft} onChange={(event) => setChatDraft(event.target.value)} placeholder="房間訊息…" /><Button size="1" variant="soft" onClick={sendMessage} disabled={!chatDraft.trim()}>送出</Button></Box>
+          </section>
+
+          <section className="run-panel">
+            <Flex justify="between" align="center"><Box><Text size="1" color="gray" weight="bold">SHARED AGENT</Text><Heading size="4">即時執行</Heading></Box><Badge color="cyan">TokenRouter auto</Badge></Flex>
+            {notice && <Card className="notice"><Text size="2">{notice}</Text></Card>}
+            <Box className="stream-output"><pre>{liveOutput || latestOutput(room) || "共同意圖準備好後，任何有權限的角色都能啟動 agent。"}</pre></Box>
+            {room.state === "RUNNING" ? <Card className="steer-box">
+              <Text size="2" weight="bold">Steering Queue</Text>
+              <TextArea value={steer} onChange={(event) => setSteer(event.target.value)} placeholder="下一個步驟前要修正什麼？" />
+              <Flex gap="2"><Button size="2" onClick={() => sendSteer("nudge")} disabled={!steer.trim()}>⚡ Nudge</Button><Button size="2" color="red" variant="soft" onClick={() => sendSteer("halt")}>Halt</Button></Flex>
+            </Card> : <Card className="run-box">
+              <TextArea value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="告訴共享 agent 這一輪要完成什麼…" />
+              <Flex justify="between" align="center"><Select.Root value={difficulty} onValueChange={(value) => setDifficulty(value as Difficulty)}><Select.Trigger /><Select.Content><Select.Item value="cheap">Fast / cheap</Select.Item><Select.Item value="standard">Balanced</Select.Item><Select.Item value="hard">Hard task</Select.Item></Select.Content></Select.Root><Button onClick={run} disabled={busy || !prompt.trim()}>{busy ? "Running…" : "▶ Run"}</Button></Flex>
+            </Card>}
+          </section>
+
+          <ArtifactPanel room={room} onVote={vote} onExport={exportIssue} />
         </section>
-        <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} room={room} updateRoom={updateRoom} />
-        <SystemDialog open={systemOpen} onOpenChange={setSystemOpen} value={room.systemPrompt} onSave={systemPrompt => updateRoom({ systemPrompt })} />
-        <Dialog.Root open={exportOpen} onOpenChange={setExportOpen}><Dialog.Content maxWidth="500px"><Dialog.Title>Save project</Dialog.Title><Dialog.Description size="2">Publish the generated files to a private GitHub repository, or download a portable project bundle.</Dialog.Description><Flex direction="column" gap="3" mt="4"><label><Text size="2" weight="medium">GitHub repository</Text><TextField.Root mt="1" value={githubRepo} onChange={event => setGithubRepo(event.target.value)} placeholder="my-co-prompt-project" /></label><label><Text size="2" weight="medium">GitHub fine-grained token</Text><TextField.Root mt="1" type="password" value={githubToken} onChange={event => setGithubToken(event.target.value)} placeholder="github_pat_..." /></label><Text size="1" color="gray">The token is used only for this request. Grant Contents read/write permission.</Text>{publishedUrl && <Callout.Root color={publishedUrl.startsWith("http") ? "green" : "red"}><Callout.Text>{publishedUrl.startsWith("http") ? <a href={publishedUrl} target="_blank">Repository published — open GitHub</a> : publishedUrl}</Callout.Text></Callout.Root>}</Flex><Flex justify="between" gap="2" mt="5"><Button variant="soft" color="gray" onClick={exportProject}>Download bundle</Button><Flex gap="2"><Dialog.Close><Button variant="soft" color="gray">Close</Button></Dialog.Close><Button disabled={!githubToken.trim() || !githubRepo.trim() || publishing} onClick={() => void publishGitHub()}>{publishing ? "Publishing…" : "Publish to GitHub"}</Button></Flex></Flex></Dialog.Content></Dialog.Root>
-        <Dialog.Root open={changesOpen} onOpenChange={setChangesOpen}><Dialog.Content maxWidth="700px"><Dialog.Title>Agent changes</Dialog.Title><Dialog.Description size="2" mb="3">The agent changed {lastChange.join(", ") || "a project file"}.</Dialog.Description><Card><pre className="diff">+ // AI update applied{"\n"}+ // Review the active file in the editor for the complete change.</pre></Card><Flex justify="end" mt="4"><Dialog.Close><Button>Done</Button></Dialog.Close></Flex></Dialog.Content></Dialog.Root>
       </main>}
   </Theme>;
 }
 
-function Welcome({ roomName, setRoomName, userName, setUserName, enterRoom }: { roomName: string; setRoomName: (value: string) => void; userName: string; setUserName: (value: string) => void; enterRoom: () => void }) {
-  return <main className="welcome"><Card className="welcome-card"><Box className="welcome-logo">⌘</Box><Heading size="7" mb="2">Code together with an agent.</Heading><Text as="p" color="gray" mb="6">Create a room for your project. Open the same room link in another tab or browser to collaborate.</Text><Flex direction="column" gap="4"><label><Text size="2" weight="medium">Your name</Text><TextField.Root mt="1" placeholder="Ada Lovelace" value={userName} onChange={event => setUserName(event.target.value)} /></label><label><Text size="2" weight="medium">Project name</Text><TextField.Root mt="1" value={roomName} onChange={event => setRoomName(event.target.value)} /></label><Button size="3" onClick={enterRoom}>Create collaboration room</Button></Flex><Separator my="5" size="4" /><Text size="1" color="gray">AI changes are controlled from room chat. Configure TokenRouter or another OpenAI-compatible provider once you’re inside.</Text></Card></main>;
+function latestOutput(room: Room) {
+  return [...room.runs].reverse().find((run) => run.output)?.output || "";
 }
 
-function SettingsDialog({ open, onOpenChange, room, updateRoom }: { open: boolean; onOpenChange: (value: boolean) => void; room: Room; updateRoom: (update: Partial<Room>) => void }) {
-  const [provider, setProvider] = useState(room.provider);
-  const [models, setModels] = useState<string[]>([]);
-  const [loadingModels, setLoadingModels] = useState(false);
-  const [modelError, setModelError] = useState("");
-  useEffect(() => setProvider(room.provider), [room.provider, open]);
-  const loadModels = async () => {
-    if (!provider.apiKey) { setModelError("Add your API key first."); return; }
-    setLoadingModels(true); setModelError("");
-    try {
-      const response = await fetch("/api/models", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ apiKey: provider.apiKey, baseUrl: provider.name === "TokenRouter" ? TOKENROUTER_BASE_URL : provider.baseUrl }) });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Could not load models.");
-      setModels(result.models); if (!provider.model && result.models[0]) setProvider(current => ({ ...current, model: result.models[0] }));
-      if (!result.models.length) setModelError("No chat models are enabled for this key.");
-    } catch (error) { setModelError(error instanceof Error ? error.message : "Could not load models."); }
-    finally { setLoadingModels(false); }
-  };
-  return <Dialog.Root open={open} onOpenChange={onOpenChange}><Dialog.Content maxWidth="500px"><Dialog.Title>AI connection</Dialog.Title><Dialog.Description size="2">Load the models available to your TokenRouter key, then select one before saving.</Dialog.Description><Flex direction="column" gap="3" mt="4"><label><Text size="2" weight="medium">Provider</Text><Select.Root value={provider.name} onValueChange={name => setProvider({ ...provider, name, baseUrl: name === "TokenRouter" ? TOKENROUTER_BASE_URL : provider.baseUrl })}><Select.Trigger mt="1" /><Select.Content><Select.Item value="TokenRouter">TokenRouter</Select.Item><Select.Item value="OpenAI-compatible">OpenAI-compatible</Select.Item></Select.Content></Select.Root></label><label><Flex justify="between"><Text size="2" weight="medium">Model</Text><Button size="1" variant="ghost" onClick={() => void loadModels()}>{loadingModels ? "Loading…" : "Load available models"}</Button></Flex>{models.length ? <Select.Root value={provider.model} onValueChange={model => setProvider({ ...provider, model })}><Select.Trigger mt="1" /><Select.Content>{models.map(model => <Select.Item key={model} value={model}>{model}</Select.Item>)}</Select.Content></Select.Root> : <TextField.Root mt="1" value={provider.model} onChange={event => setProvider({ ...provider, model: event.target.value })} placeholder="Load models or enter a model id" />}{modelError && <Text as="p" size="1" color="red" mt="1">{modelError}</Text>}</label><label><Text size="2" weight="medium">API base URL</Text><TextField.Root mt="1" value={provider.name === "TokenRouter" ? TOKENROUTER_BASE_URL : provider.baseUrl} disabled={provider.name === "TokenRouter"} onChange={event => setProvider({ ...provider, baseUrl: event.target.value })} placeholder={TOKENROUTER_BASE_URL} /></label><label><Text size="2" weight="medium">API key</Text><TextField.Root mt="1" type="password" value={provider.apiKey} onChange={event => setProvider({ ...provider, apiKey: event.target.value })} placeholder="tr_..." /></label></Flex><Flex justify="end" gap="2" mt="5"><Dialog.Close><Button variant="soft" color="gray">Cancel</Button></Dialog.Close><Dialog.Close><Button onClick={() => updateRoom({ provider: provider.name === "TokenRouter" ? { ...provider, baseUrl: TOKENROUTER_BASE_URL } : provider })}>Save connection</Button></Dialog.Close></Flex></Dialog.Content></Dialog.Root>;
+function ArtifactPanel({ room, onVote, onExport }: { room: Room; onVote: (vote: "approve" | "request_changes") => void; onExport: () => void }) {
+  const latest = (kind: Artifact["kind"]) => [...room.artifacts].reverse().find((item) => item.kind === kind);
+  const html = latest("html");
+  return <section className="artifact-panel">
+    <Flex justify="between" align="center"><Box><Text size="1" color="gray" weight="bold">TEST CAPITAL</Text><Heading size="4">產物與核准</Heading></Box>{html && <Badge>v{html.version}</Badge>}</Flex>
+    <Tabs.Root defaultValue="preview"><Tabs.List><Tabs.Trigger value="preview">預覽</Tabs.Trigger><Tabs.Trigger value="tests">測試</Tabs.Trigger><Tabs.Trigger value="criteria">驗收</Tabs.Trigger></Tabs.List>
+      <Box className="artifact-body"><Tabs.Content value="preview">{html ? <iframe title="Generated artifact" sandbox="allow-scripts" srcDoc={html.content} /> : <Empty text="Agent 的單檔 HTML 會在這裡即時預覽。" />}</Tabs.Content><Tabs.Content value="tests"><pre>{latest("tests")?.content || "尚無測試產物。"}</pre></Tabs.Content><Tabs.Content value="criteria"><pre>{latest("criteria")?.content || "尚無驗收產物。"}</pre></Tabs.Content></Box>
+    </Tabs.Root>
+    <Card className="approval-box"><Text size="2" weight="bold">Room approval gate</Text><Text as="p" size="1" color="gray">所有可投票角色核准後，才能建立 PDD Issue。</Text><Flex gap="2" wrap="wrap"><Button size="1" color="green" onClick={() => onVote("approve")}>Approve</Button><Button size="1" color="red" variant="soft" onClick={() => onVote("request_changes")}>Request changes</Button><Button size="1" variant="outline" onClick={onExport}>匯出 PDD Issue</Button></Flex></Card>
+  </section>;
 }
 
-function SystemDialog({ open, onOpenChange, value, onSave }: { open: boolean; onOpenChange: (value: boolean) => void; value: string; onSave: (value: string) => void }) {
-  const [prompt, setPrompt] = useState(value); useEffect(() => setPrompt(value), [value, open]);
-  return <Dialog.Root open={open} onOpenChange={onOpenChange}><Dialog.Content maxWidth="620px"><Dialog.Title>Project system prompt</Dialog.Title><Dialog.Description size="2">This context is sent with every live agent request and guides local mode as well.</Dialog.Description><TextArea mt="4" value={prompt} onChange={event => setPrompt(event.target.value)} style={{ minHeight: 190 }} /><Flex justify="end" gap="2" mt="4"><Dialog.Close><Button variant="soft" color="gray">Cancel</Button></Dialog.Close><Dialog.Close><Button onClick={() => onSave(prompt)}>Save context</Button></Dialog.Close></Flex></Dialog.Content></Dialog.Root>;
+function Empty({ text }: { text: string }) {
+  return <Box className="empty"><Text size="2" color="gray">{text}</Text></Box>;
+}
+
+function Welcome(props: {
+  name: string; setName: (value: string) => void; role: Role; setRole: (value: Role) => void;
+  title: string; setTitle: (value: string) => void; roomCode: string; setRoomCode: (value: string) => void;
+  join: () => void; notice: string;
+}) {
+  return <main className="welcome"><Card className="welcome-card"><Box className="welcome-logo">⌘</Box><Heading size="7">Prompt capital，多人一起寫。</Heading><Text as="p" color="gray" mt="2" mb="5">一個房間、N 個人類角色、同一個共享 agent。執行中也能導引，不必等它走偏。</Text><Flex direction="column" gap="3"><TextField.Root placeholder="你的名字" value={props.name} onChange={(event) => props.setName(event.target.value)} /><Select.Root value={props.role} onValueChange={(value) => props.setRole(value as Role)}><Select.Trigger /><Select.Content><Select.Item value="pm">PM · 範圍</Select.Item><Select.Item value="eng">ENG · 實作</Select.Item><Select.Item value="design">DESIGN · 體驗</Select.Item><Select.Item value="qa">QA · 驗證</Select.Item><Select.Item value="observer">Observer</Select.Item></Select.Content></Select.Root><TextField.Root placeholder="專案名稱" value={props.title} onChange={(event) => props.setTitle(event.target.value)} /><TextField.Root placeholder="房間代碼（留空建立新房）" value={props.roomCode} onChange={(event) => props.setRoomCode(event.target.value)} /><Button size="3" onClick={props.join}>{props.roomCode ? "加入房間" : "建立協作房間"}</Button></Flex>{props.notice && <Text as="p" size="2" color="red" mt="3">{props.notice}</Text>}</Card></main>;
 }

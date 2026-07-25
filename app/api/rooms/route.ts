@@ -1,20 +1,26 @@
-import { NextResponse } from "next/server";
+import { z } from "zod";
+import { issueIdentity } from "@/lib/server/auth";
+import { createOrJoinRoom } from "@/lib/server/rooms";
 
-// Intentionally small: this makes a shared room work on one deployed instance.
-// The browser also keeps a local copy, so a refresh does not lose the project.
-const rooms = new Map<string, unknown>();
+export const runtime = "nodejs";
 
-export async function GET(request: Request) {
-  const id = new URL(request.url).searchParams.get("id");
-  const room = id ? rooms.get(id) : undefined;
-  return room ? NextResponse.json(room) : NextResponse.json({ error: "Room not found" }, { status: 404 });
-}
+const schema = z.object({
+  roomId: z.string().max(48).optional(),
+  title: z.string().max(100).optional(),
+  userId: z.string().min(1).max(100),
+  name: z.string().min(1).max(60),
+  role: z.enum(["pm", "eng", "design", "qa", "observer"]),
+});
 
 export async function POST(request: Request) {
-  const room = await request.json() as { id?: string; provider?: { apiKey?: string } };
-  if (!room?.id) return NextResponse.json({ error: "A room id is required." }, { status: 400 });
-  // Provider keys are deliberately never shared or retained by the room service.
-  if (room.provider) room.provider.apiKey = "";
-  rooms.set(room.id, room);
-  return NextResponse.json(room);
+  const parsed = schema.safeParse(await request.json());
+  if (!parsed.success) return Response.json({ error: "房間資料格式錯誤。" }, { status: 400 });
+  const room = createOrJoinRoom({ roomId: parsed.data.roomId, title: parsed.data.title, participant: parsed.data });
+  const token = issueIdentity({
+    roomId: room.id,
+    userId: parsed.data.userId,
+    name: parsed.data.name,
+    role: parsed.data.role,
+  });
+  return Response.json({ room, token });
 }
