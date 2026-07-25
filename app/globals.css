@@ -237,6 +237,12 @@ body {
   overflow-wrap: anywhere;
 }
 
+.generated-code {
+  min-height: 100%;
+  background: var(--ink);
+  color: #7dd88f !important;
+}
+
 .run-box, .steer-box, .approval-box {
   display: flex;
   flex-direction: column;

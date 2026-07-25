@@ -84,7 +84,11 @@ function recentContext(room: Room): string {
 function saveArtifacts(roomId: string, runId: string, output: string): void {
   const pattern = /<artifact\s+kind="(html|tests|criteria)">([\s\S]*?)<\/artifact>/gi;
   for (const match of output.matchAll(pattern)) {
-    addArtifact(roomId, { runId, kind: match[1].toLowerCase() as "html" | "tests" | "criteria", content: match[2].trim() });
+    const kind = match[1].toLowerCase() as "html" | "tests" | "criteria";
+    const content = kind === "html"
+      ? match[2].trim().replace(/^```(?:html)?\s*/i, "").replace(/\s*```$/, "")
+      : match[2].trim();
+    if (content) addArtifact(roomId, { runId, kind, content });
   }
 }
 
