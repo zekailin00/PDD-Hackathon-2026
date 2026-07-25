@@ -259,7 +259,7 @@ const roleColor: Record<Role, "indigo" | "orange" | "pink" | "green" | "gray"> =
 const presenceColor = { online: "#59cf96", away: "#f2b84b", offline: "#6d707c" };
 
 type Identity = { userId: string; name: string; role: Role };
-type RoomResponse = { room: Room; token: string; inviteCode?: string; error?: string };
+type RoomResponse = { room: Room; token: string; inviteCode?: string; identity?: Identity; error?: string };
 
 function submitOnEnter(event: KeyboardEvent<HTMLTextAreaElement>, submit: () => void): void {
   if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
@@ -360,7 +360,10 @@ export default function Home() {
       } else if (value.type === "steer_applied") {
         setNotice(`⚡ ${value.steers.length} ${copy.steerApplied}`);
       } else if (value.type === "halted") {
+        setProgress(null);
         setNotice(`${value.by} ${copy.haltedBy}`);
+      } else if (value.type === "done") {
+        setProgress(null);
       } else if (value.type === "error") {
         setNotice(value.message);
       }
@@ -386,8 +389,9 @@ export default function Home() {
   }, [room?.id, token]);
 
   const enterRoom = (data: RoomResponse, nextIdentity: Identity) => {
-    localStorage.setItem(identityKey, JSON.stringify(nextIdentity));
-    setIdentity(nextIdentity);
+    const resolvedIdentity = data.identity || nextIdentity;
+    localStorage.setItem(identityKey, JSON.stringify(resolvedIdentity));
+    setIdentity(resolvedIdentity);
     setToken(data.token);
     setRoom(data.room);
     setIntentDraft(data.room.intent);
@@ -590,6 +594,7 @@ export default function Home() {
           </Box>)}
           <PreferenceControls {...{ locale, setLocale, themeMode, setThemeMode }} compact />
           <Button size="1" variant="soft" onClick={() => void navigator.clipboard.writeText(inviteUrl)}>{copy.copyInvite}</Button>
+          <Button size="1" variant="soft" onClick={() => void navigator.clipboard.writeText(room.id)}>Room {room.id}</Button>
           {room.createdBy === identity.userId && !room.isDemo && <Button size="1" variant="outline" onClick={() => setSettingsOpen(true)}>{copy.roomSettings}</Button>}
           <Button size="1" color="red" variant="ghost" onClick={() => void logout()}>{copy.logout}</Button>
         </Flex>

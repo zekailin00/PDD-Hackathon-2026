@@ -37,6 +37,7 @@ store.sourceContexts ??= new Map<string, string>();
 
 const now = () => new Date().toISOString();
 const inviteCode = () => randomBytes(18).toString("base64url");
+const sameName = (a: string, b: string) => a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase();
 
 function cleanRoomId(value: string): string {
   const id = value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 48);
@@ -300,7 +301,10 @@ export function joinRoom(input: {
   if (room.visibility === "private" && input.inviteCode !== secret?.inviteCode) {
     throw new Error("This private room requires a valid invite link.");
   }
-  const joined = participant(input.participant);
+  // Names are the stable room-level identity: refreshing or rejoining with
+  // the same name restores the existing participant and its role.
+  const existing = room.participants.find((item) => sameName(item.name, input.participant.name));
+  const joined = existing ? { ...existing, status: "online" as const, lastSeenAt: now() } : participant(input.participant);
   room.participants = [...room.participants.filter((item) => item.userId !== joined.userId), joined];
   room.updatedAt = joined.lastSeenAt;
   publish(room.id, { type: "presence", participants: room.participants });
@@ -366,8 +370,11 @@ export function setPresence(roomId: string, userId: string, status: Presence): v
   publishSnapshot(room);
 }
 
-export function removeParticipant(roomId: string, userId: string): void {
+export function removeParticipant(roomId: string, userId: string, presenceStamp?: string): void {
   const room = requiredRoom(roomId);
+  const participant = room.participants.find((item) => item.userId === userId);
+  // Ignore a delayed close beacon from a tab that was refreshed or rejoined.
+  if (presenceStamp && participant?.lastSeenAt !== presenceStamp) return;
   room.participants = room.participants.filter((item) => item.userId !== userId);
   room.updatedAt = now();
   publish(room.id, { type: "presence", participants: room.participants });
