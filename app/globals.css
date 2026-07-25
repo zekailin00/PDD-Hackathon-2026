@@ -450,8 +450,11 @@ body {
   border: var(--border-thin) !important;
   border-radius: 5px !important;
   box-shadow: var(--shadow-sm);
+  cursor: pointer;
   font-weight: 700 !important;
   letter-spacing: .01em;
+  touch-action: manipulation;
+  user-select: none;
   transition: transform .08s, box-shadow .08s;
 }
 
@@ -463,7 +466,11 @@ body {
   transform: translate(2px, 2px);
   box-shadow: none;
 }
-.radix-themes .rt-Button:disabled { box-shadow: none; opacity: .5; }
+.radix-themes .rt-Button:disabled {
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: .5;
+}
 
 .radix-themes .rt-Button {
   background: var(--orange) !important;
