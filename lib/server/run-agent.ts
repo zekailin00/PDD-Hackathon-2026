@@ -83,12 +83,23 @@ function recentContext(room: Room): string {
 
 function saveArtifacts(roomId: string, runId: string, output: string): void {
   const pattern = /<artifact\s+kind="(html|tests|criteria)">([\s\S]*?)<\/artifact>/gi;
+  let hasHtml = false;
   for (const match of output.matchAll(pattern)) {
     const kind = match[1].toLowerCase() as "html" | "tests" | "criteria";
     const content = kind === "html"
       ? match[2].trim().replace(/^```(?:html)?\s*/i, "").replace(/\s*```$/, "")
       : match[2].trim();
-    if (content) addArtifact(roomId, { runId, kind, content });
+    if (content) {
+      if (kind === "html") hasHtml = true;
+      addArtifact(roomId, { runId, kind, content });
+    }
+  }
+  // Keep the preview useful if a model forgets the wrapper but still returns a
+  // complete browser document. The system prompt asks for the wrapper; this is
+  // a recovery path, not a second output format.
+  if (!hasHtml) {
+    const document = output.match(/(?:<!doctype html>|<html\b)[\s\S]*?<\/html>/i)?.[0];
+    if (document) addArtifact(roomId, { runId, kind: "html", content: document });
   }
 }
 
