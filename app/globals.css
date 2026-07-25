@@ -484,6 +484,53 @@ body {
 .radix-themes .rt-TextFieldInput { color: var(--ink) !important; }
 .radix-themes input::placeholder,
 .radix-themes textarea::placeholder { color: var(--placeholder) !important; }
+
+.field-group { min-width: 0; }
+.field-label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.zip-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.zip-picker {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 9px 12px;
+  overflow: hidden;
+  border: var(--border-thin);
+  border-radius: 5px;
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+  font: 700 12px/1.4 "Space Mono", monospace;
+  cursor: pointer;
+}
+
+.zip-picker span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zip-input:focus-visible + .zip-picker {
+  outline: 3px solid var(--orange);
+  outline-offset: 2px;
+}
+
 .radix-themes .rt-SelectContent {
   border: var(--border) !important;
   border-radius: 6px !important;

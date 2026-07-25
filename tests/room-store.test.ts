@@ -4,6 +4,7 @@ import {
   createRoom,
   getRoom,
   getRoomProvider,
+  getRoomSourceContext,
   joinRoom,
   listPublicRooms,
   removeParticipant,
@@ -88,5 +89,27 @@ describe("production room boundaries", () => {
     expect(demo?.messages.some((message) => message.content.includes("唯一含有示範資料"))).toBe(true);
     expect(created.room.isDemo).toBeUndefined();
     expect(created.room.messages.some((message) => message.content.includes("示範資料"))).toBe(false);
+  });
+
+  it("keeps imported ZIP content server-side while exposing safe metadata", () => {
+    const created = createRoom({
+      title: "Imported project",
+      visibility: "public",
+      participant: creator,
+      sourceArchive: {
+        name: "project.zip",
+        fileCount: 2,
+        truncated: false,
+        context: "--- FILE: app.ts ---\nconsole.log('ready');",
+      },
+    });
+
+    expect(created.room.sourceArchive).toEqual({
+      name: "project.zip",
+      fileCount: 2,
+      truncated: false,
+    });
+    expect(JSON.stringify(created.room)).not.toContain("console.log");
+    expect(getRoomSourceContext(created.room.id)).toContain("console.log");
   });
 });

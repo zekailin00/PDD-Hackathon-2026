@@ -63,6 +63,14 @@ const COPY = {
     privateInvite: "Private — invite link only",
     preferredModel: "Preferred model (leave blank for TokenRouter auto)",
     apiKeyCreate: "TokenRouter API key (optional; kept in server memory only)",
+    startingZipLabel: "Starting project ZIP (optional)",
+    startingZipHelp: "Upload up to 10 MB. Code and text files become read-only context for the shared agent.",
+    chooseZip: "Choose a .zip project",
+    zipTooLarge: "The ZIP file must be 10 MB or smaller.",
+    zipRequired: "Please choose a .zip file.",
+    systemPromptLabel: "Shared agent System Prompt",
+    systemPromptHelp: "These instructions apply to every AI run in this room.",
+    files: "files",
     creating: "Creating…",
     createFailed: "Could not create the room.",
     selectRoomFirst: "Select a room from the list.",
@@ -151,6 +159,14 @@ const COPY = {
     privateInvite: "私人 — 僅邀請連結",
     preferredModel: "偏好模型（留空由 TokenRouter 自動選擇）",
     apiKeyCreate: "TokenRouter API Key（選填；只保留在伺服器記憶體）",
+    startingZipLabel: "初始專案 ZIP（選填）",
+    startingZipHelp: "最多 10 MB；程式碼與文字檔會成為共用 agent 的唯讀初始內容。",
+    chooseZip: "選擇 .zip 專案",
+    zipTooLarge: "ZIP 檔案不可超過 10 MB。",
+    zipRequired: "請選擇 .zip 檔案。",
+    systemPromptLabel: "共用 Agent System Prompt",
+    systemPromptHelp: "這些指令會套用到此房間的每一次 AI 執行。",
+    files: "個檔案",
     creating: "建立中…",
     createFailed: "建立房間失敗。",
     selectRoomFirst: "請從清單選擇房間。",
@@ -248,6 +264,7 @@ export default function Home() {
   const [preferredModel, setPreferredModel] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [systemPrompt, setSystemPrompt] = useState(ROOM_AGENT_SYSTEM);
+  const [projectZip, setProjectZip] = useState<File | null>(null);
   const [intentDraft, setIntentDraft] = useState("");
   const [prompt, setPrompt] = useState("");
   const [steer, setSteer] = useState("");
@@ -354,6 +371,7 @@ export default function Home() {
     setIntentDraft(data.room.intent);
     setCreatorInviteCode(data.inviteCode || "");
     setApiKey("");
+    setProjectZip(null);
     const invite = data.room.visibility === "private" ? data.inviteCode || urlInviteCode : "";
     const query = new URLSearchParams({ room: data.room.id });
     if (invite) query.set("invite", invite);
@@ -361,22 +379,30 @@ export default function Home() {
   };
 
   const createSession = async () => {
+    if (projectZip && !projectZip.name.toLowerCase().endsWith(".zip")) {
+      return setNotice(copy.zipRequired);
+    }
+    if (projectZip && projectZip.size > 10 * 1024 * 1024) {
+      return setNotice(copy.zipTooLarge);
+    }
     const nextIdentity = identityFromForm(identity, name, role);
+    const form = new FormData();
+    for (const [key, value] of Object.entries({
+      action: "create",
+      ...nextIdentity,
+      title,
+      visibility,
+      preferredModel,
+      systemPrompt,
+      apiKey,
+      baseUrl: "https://api.tokenrouter.com/v1",
+    })) form.set(key, value);
+    if (projectZip) form.set("projectZip", projectZip);
     setBusy(true);
     try {
       const response = await fetch("/api/rooms", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "create",
-          ...nextIdentity,
-          title,
-          visibility,
-          preferredModel,
-          systemPrompt,
-          apiKey,
-          baseUrl: "https://api.tokenrouter.com/v1",
-        }),
+        body: form,
       });
       const data = await response.json() as RoomResponse;
       if (!response.ok) return setNotice(data.error || copy.createFailed);
@@ -516,6 +542,7 @@ export default function Home() {
         name, setName, role, setRole, title, setTitle, roomCode, setRoomCode,
         publicRooms, urlInviteCode, visibility, setVisibility, preferredModel,
         setPreferredModel, apiKey, setApiKey, systemPrompt, setSystemPrompt,
+        projectZip, setProjectZip,
         createSession, joinSession, busy, notice, copy, locale, setLocale,
         themeMode, setThemeMode,
       }}
@@ -525,6 +552,7 @@ export default function Home() {
           <Box className="brand-mark">⌘</Box>
           <Heading size="3">co-prompt</Heading>
           <Badge color={room.isDemo ? "violet" : "indigo"}>{room.isDemo ? "Demo" : room.visibility}</Badge>
+          {room.sourceArchive && <Badge color="cyan" title={room.sourceArchive.name}>ZIP · {room.sourceArchive.fileCount} {copy.files}</Badge>}
         </Flex>
         <Flex align="center" gap="2">
           <Badge color={room.state === "RUNNING" ? "amber" : room.state === "PROPOSED" ? "violet" : "green"}>{room.state}</Badge>
@@ -753,6 +781,8 @@ function Welcome(props: {
   setApiKey: (value: string) => void;
   systemPrompt: string;
   setSystemPrompt: (value: string) => void;
+  projectZip: File | null;
+  setProjectZip: (value: File | null) => void;
   createSession: () => void;
   joinSession: () => void;
   busy: boolean;
@@ -809,7 +839,31 @@ function Welcome(props: {
               </Select.Root>
               <TextField.Root placeholder={props.copy.preferredModel} value={props.preferredModel} onChange={(event) => props.setPreferredModel(event.target.value)} />
               <TextField.Root type="password" placeholder={props.copy.apiKeyCreate} value={props.apiKey} onChange={(event) => props.setApiKey(event.target.value)} />
-              <TextArea value={props.systemPrompt} onChange={(event) => props.setSystemPrompt(event.target.value)} placeholder="System Prompt" />
+              <Box className="field-group">
+                <label className="field-label" htmlFor="project-zip">{props.copy.startingZipLabel}</label>
+                <Text as="p" size="1" color="gray" mb="2">{props.copy.startingZipHelp}</Text>
+                <input
+                  id="project-zip"
+                  className="zip-input"
+                  type="file"
+                  accept=".zip,application/zip"
+                  onChange={(event) => props.setProjectZip(event.target.files?.[0] ?? null)}
+                />
+                <label className="zip-picker" htmlFor="project-zip">
+                  <span>📦</span>
+                  <span>{props.projectZip?.name || props.copy.chooseZip}</span>
+                </label>
+              </Box>
+              <Box className="field-group">
+                <label className="field-label" htmlFor="create-system-prompt">{props.copy.systemPromptLabel}</label>
+                <Text as="p" size="1" color="gray" mb="2" id="create-system-prompt-help">{props.copy.systemPromptHelp}</Text>
+                <TextArea
+                  id="create-system-prompt"
+                  aria-describedby="create-system-prompt-help"
+                  value={props.systemPrompt}
+                  onChange={(event) => props.setSystemPrompt(event.target.value)}
+                />
+              </Box>
               <Button size="3" onClick={props.createSession} disabled={props.busy || !props.title.trim()}>{props.busy ? props.copy.creating : props.copy.createSession}</Button>
             </Flex>
           </Tabs.Content>
@@ -879,7 +933,16 @@ function RoomSettingsDialog(props: {
         </Select.Root>
         <TextField.Root value={preferredModel} onChange={(event) => setPreferredModel(event.target.value)} placeholder="Preferred model or TokenRouter auto" />
         <TextField.Root type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={props.copy.newApiKey} />
-        <TextArea value={systemPrompt} onChange={(event) => setSystemPrompt(event.target.value)} />
+        <Box className="field-group">
+          <label className="field-label" htmlFor="settings-system-prompt">{props.copy.systemPromptLabel}</label>
+          <Text as="p" size="1" color="gray" mb="2" id="settings-system-prompt-help">{props.copy.systemPromptHelp}</Text>
+          <TextArea
+            id="settings-system-prompt"
+            aria-describedby="settings-system-prompt-help"
+            value={systemPrompt}
+            onChange={(event) => setSystemPrompt(event.target.value)}
+          />
+        </Box>
       </Flex>
       <Flex justify="end" gap="2" mt="5"><Dialog.Close><Button variant="soft" color="gray">{props.copy.cancel}</Button></Dialog.Close><Button onClick={save}>{props.copy.saveSettings}</Button></Flex>
     </Dialog.Content>

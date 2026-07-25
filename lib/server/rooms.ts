@@ -22,6 +22,7 @@ type Store = {
   rooms: Map<string, Room>;
   listeners: Map<string, Set<Listener>>;
   secrets: Map<string, RoomSecret>;
+  sourceContexts: Map<string, string>;
 };
 
 const globalStore = globalThis as typeof globalThis & { __copromptStore?: Store };
@@ -29,8 +30,10 @@ const store: Store = globalStore.__copromptStore ?? {
   rooms: new Map<string, Room>(),
   listeners: new Map<string, Set<Listener>>(),
   secrets: new Map<string, RoomSecret>(),
+  sourceContexts: new Map<string, string>(),
 };
 globalStore.__copromptStore = store;
+store.sourceContexts ??= new Map<string, string>();
 
 const now = () => new Date().toISOString();
 const inviteCode = () => randomBytes(18).toString("base64url");
@@ -103,6 +106,12 @@ export function createRoom(input: {
   preferredModel?: string;
   apiKey?: string;
   baseUrl?: string;
+  sourceArchive?: {
+    name: string;
+    fileCount: number;
+    truncated: boolean;
+    context: string;
+  };
   participant: { userId: string; name: string; role: Role };
 }): { room: Room; inviteCode: string } {
   let roomId = randomUUID().slice(0, 8);
@@ -115,6 +124,11 @@ export function createRoom(input: {
     visibility: input.visibility,
     systemPrompt: input.systemPrompt?.trim().slice(0, 20_000) || ROOM_AGENT_SYSTEM,
     preferredModel: input.preferredModel?.trim().slice(0, 200) || "",
+    sourceArchive: input.sourceArchive ? {
+      name: input.sourceArchive.name,
+      fileCount: input.sourceArchive.fileCount,
+      truncated: input.sourceArchive.truncated,
+    } : undefined,
     state: "IDLE",
     intent: "## Goal\n\n## Acceptance criteria\n\n## Must not\n",
     participants: [participant(input.participant)],
@@ -124,7 +138,9 @@ export function createRoom(input: {
       userId: "agent",
       role: "agent",
       kind: "system",
-      content: "房間已準備好。共同編寫意圖，然後啟動 agent。",
+      content: input.sourceArchive
+        ? `房間已準備好，已載入 ${input.sourceArchive.name} 的 ${input.sourceArchive.fileCount} 個文字檔${input.sourceArchive.truncated ? "（已依安全限制截斷）" : ""}。共同編寫意圖，然後啟動 agent。`
+        : "房間已準備好。共同編寫意圖，然後啟動 agent。",
       createdAt: timestamp,
     }],
     runs: [],
@@ -141,6 +157,7 @@ export function createRoom(input: {
   };
   store.rooms.set(roomId, room);
   store.secrets.set(roomId, secret);
+  if (input.sourceArchive) store.sourceContexts.set(roomId, input.sourceArchive.context);
   return { room, inviteCode: secret.inviteCode };
 }
 
@@ -194,6 +211,10 @@ export function updateRoomSettings(
 export function getRoomProvider(roomId: string): { apiKey?: string; baseUrl?: string } {
   const secret = store.secrets.get(cleanRoomId(roomId));
   return { apiKey: secret?.apiKey, baseUrl: secret?.baseUrl };
+}
+
+export function getRoomSourceContext(roomId: string): string {
+  return store.sourceContexts.get(cleanRoomId(roomId)) ?? "";
 }
 
 export function updateIntent(roomId: string, intent: string): Room {
