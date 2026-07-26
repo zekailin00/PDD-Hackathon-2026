@@ -1,0 +1,17 @@
+% generated-code-download — export generated code as a standalone TypeScript module
+
+# Module: generated-code-download
+
+Create a dependency-free TypeScript browser utility exporting exactly
+`toGeneratedTypeScriptModule(source, exportName?)` and
+`downloadGeneratedTypeScript(source, filename?, exportName?)`.
+
+The first function MUST losslessly embed any non-empty source string (HTML, CSS,
+JavaScript, backticks, and Unicode included) in a self-contained `.ts` module as
+both a named constant and default export. Validate the export name as a valid
+TypeScript identifier. Use JSON.stringify or an equivalent lossless escape.
+
+The download function MUST use a UTF-8 TypeScript Blob and browser anchor
+download flow, append `.ts` when missing, revoke the object URL after clicking,
+reject empty input, and fail clearly outside a browser. Do not mutate source,
+make network requests, or introduce dependencies.

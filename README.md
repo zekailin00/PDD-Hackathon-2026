@@ -75,6 +75,33 @@ npm run check
 The PDD source prompts live in `prompts/`; generated decision modules live in
 `pdd/`; behavior and security-boundary tests live in `tests/`.
 
+## PDD artifact chain: generated-code download
+
+This commit includes a complete PDD artifact chain for the **Download generated
+code** action in the room artifact panel. It is deliberately kept as a small,
+reviewable library rather than embedding browser-download details in the React
+screen.
+
+| Chain stage | File | What it proves |
+|---|---|---|
+| Prompt source of truth | [`prompts/generated_code_download_typescript.prompt`](prompts/generated_code_download_typescript.prompt) | Defines the public API, lossless escaping requirements, browser-only download contract, validation rules, and forbidden behavior. |
+| Generated TypeScript artifact | [`pdd/generated-code-download.ts`](pdd/generated-code-download.ts) | Implements the prompt contract: arbitrary generated code becomes a self-contained `.ts` module with a named and default export, then downloads through a UTF-8 Blob and browser anchor. The file header identifies the prompt it was generated from. |
+| Product integration | [`app/page.tsx`](app/page.tsx) | Imports `downloadGeneratedTypeScript`, finds the latest generated HTML artifact, and invokes the PDD module when the user presses **Download generated code**. The UI never implements its own Blob or anchor-download logic. |
+| Behavioral test | [`tests/generated-code-download.test.ts`](tests/generated-code-download.test.ts) | Verifies lossless embedding of code containing backticks and Unicode, and verifies rejection of blank source and invalid TypeScript export names. |
+
+The generated download is intentionally a TypeScript module, not a raw HTML
+file: it exports the generated browser artifact as a string, so judges or other
+developers can import it, inspect it, or use it in another application without
+depending on CoPrompt at runtime.
+
+To regenerate or review the artifact, start with the prompt above and compare
+the resulting implementation against the tests. To run the same repository gate
+used by this commit:
+
+```bash
+npm run check
+```
+
 ## Architecture
 
 Browser clients subscribe to one room SSE stream on the Node server. One client

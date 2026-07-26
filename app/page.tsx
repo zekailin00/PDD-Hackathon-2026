@@ -28,6 +28,7 @@ import type {
   RoomVisibility,
 } from "@/lib/domain";
 import { ROOM_AGENT_SYSTEM } from "@/lib/prompts";
+import { downloadGeneratedTypeScript } from "@/pdd/generated-code-download";
 import type { Difficulty } from "@/pdd/model-router";
 import type { Role } from "@/pdd/role-policy";
 
@@ -121,10 +122,10 @@ const COPY = {
     testsEmpty: "No test artifact yet.",
     criteriaEmpty: "No acceptance artifact yet.",
     approvalGate: "Room approval gate",
-    approvalHelp: "A PDD Issue can be created only after every voting role approves.",
+    approvalHelp: "Download the latest generated code as a self-contained TypeScript module.",
     approve: "Approve",
     requestChanges: "Request changes",
-    exportIssue: "Export PDD Issue",
+    exportIssue: "Download generated code",
     reading: "Reading room",
     planning: "Planning",
     building: "Building",
@@ -224,10 +225,10 @@ const COPY = {
     testsEmpty: "尚無測試產物。",
     criteriaEmpty: "尚無驗收產物。",
     approvalGate: "房間核准關卡",
-    approvalHelp: "所有可投票角色核准後，才能建立 PDD Issue。",
+    approvalHelp: "將最新生成程式碼下載成自包含的 TypeScript 模組。",
     approve: "核准",
     requestChanges: "要求修改",
-    exportIssue: "匯出 PDD Issue",
+    exportIssue: "下載生成程式碼",
     reading: "讀取房間",
     planning: "擬定計畫",
     building: "產出內容",
@@ -536,12 +537,15 @@ export default function Home() {
     setNotice(response.ok ? data.quorum.reason : data.error);
   };
 
-  const exportIssue = async () => {
+  const exportIssue = () => {
     if (!room) return;
-    const response = await fetch(`/api/rooms/${room.id}/export`, authorized(token, {}));
-    const data = await response.json();
-    if (response.ok) window.open(data.url, "_blank", "noopener,noreferrer");
-    else setNotice(data.error);
+    const html = [...room.artifacts].reverse().find((artifact) => artifact.kind === "html");
+    if (!html) return setNotice("Run the agent to generate code before downloading it.");
+    try {
+      const stem = room.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "coprompt-generated";
+      downloadGeneratedTypeScript(html.content, `${stem}.ts`);
+      setNotice("Generated TypeScript download started.");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Could not download generated code."); }
   };
   const logout = async () => {
     if (!room || !window.confirm(copy.leaveConfirm)) return;
