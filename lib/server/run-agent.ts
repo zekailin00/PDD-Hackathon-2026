@@ -205,11 +205,11 @@ export async function executeRoomAgent(input: {
       authorName: "CoPrompt agent", userId: "agent", role: "agent",
       kind: "agent", content: complete, runId: run.id,
     });
-    finishRun(input.roomId, run.id, "proposed");
     reportProgress({
       roomId: input.roomId, runId: run.id, phase: "done", step: PHASES.length,
       label: "完成，等待房間審核",
     });
+    finishRun(input.roomId, run.id, "proposed");
     return complete;
   } catch (error) {
     finishRun(input.roomId, run.id, "error");

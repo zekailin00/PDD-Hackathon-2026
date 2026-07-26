@@ -333,7 +333,9 @@ export default function Home() {
       } else if (value.type === "token") {
         setLiveOutput((current) => current + value.chunk);
       } else if (value.type === "progress") {
-        setProgress(value.progress);
+        // A terminal progress event can be emitted after the run's `done`
+        // event, so never let it recreate the transient progress card.
+        setProgress(value.progress.phase === "done" ? null : value.progress);
       } else if (value.type === "step") {
         setNotice(`${copy.step} ${value.step}: ${value.label}`);
       } else if (value.type === "steer_applied") {
@@ -344,6 +346,7 @@ export default function Home() {
       } else if (value.type === "done") {
         setProgress(null);
       } else if (value.type === "error") {
+        setProgress(null);
         setNotice(value.message);
       }
     };
