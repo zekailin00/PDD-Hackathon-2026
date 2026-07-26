@@ -17,7 +17,7 @@ Show the public Demo room and the live participant roster.
 
 Open a second browser or phone, join the same room, and choose a different role.
 Point out that PM, ENG, DESIGN, QA, and observer have different server-enforced
-powers.
+powers and creator-configurable decision priorities.
 
 ### 0:55–1:25 — Shared intent
 
@@ -32,17 +32,20 @@ Pause on:
 - identical streamed progress in both clients;
 - “picked up” versus “waiting” contribution state;
 - the named steering checkpoint;
+- every submitted prompt and action appearing in room activity;
 - Member Chat remaining separate from AI-visible context.
 
 ### 2:20–3:05 — Review the result
 
-Open the generated HTML preview, code, criteria, and tests. Show versioning and
-download the generated TypeScript module if time allows.
+Show that the middle is a non-technical, conversation-first transcript. Then
+open the generated HTML preview, code, and tests on the right. Show versioning
+and download the generated JavaScript module if time allows.
 
 ### 3:05–3:50 — Agreement becomes a gate
 
-Vote from each voting member. Before the final vote, show that export is locked.
-After the final vote, export the structured PDD Issue and open it on GitHub.
+Open the approval panel and show every eligible member's current vote. Submit a
+request-changes vote and point out that its feedback immediately appears in the
+room activity feed. Then update it to approval.
 
 Line: “The browser button is not the security boundary; the API re-evaluates
 role power and quorum before it calls GitHub.”

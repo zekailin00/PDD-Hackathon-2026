@@ -22,6 +22,18 @@ const schema = z.discriminatedUnion("operation", [
     preferredModel: z.string().max(200).optional(),
     apiKey: z.string().max(500).optional(),
     baseUrl: z.string().url().max(500).optional().or(z.literal("")),
+    roleOverrides: z.record(
+      z.enum(["pm", "eng", "design", "qa", "observer"]),
+      z.object({
+        run: z.boolean().optional(),
+        steer: z.boolean().optional(),
+        halt: z.boolean().optional(),
+        edit_intent: z.boolean().optional(),
+        vote: z.boolean().optional(),
+        open_pr: z.boolean().optional(),
+        priority: z.number().int().min(0).max(100).optional(),
+      }),
+    ).optional(),
   }),
   z.object({ operation: z.literal("presence"), status: z.enum(["online", "away", "offline"]) }),
 ]);
@@ -48,7 +60,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ roomI
       return Response.json({ ok: true });
     }
     if (parsed.data.operation === "intent") {
-      if (!can(identity.role, "edit_intent")) {
+      const room = getRoom(roomId);
+      if (!room || !can(identity.role, "edit_intent", room.roleOverrides)) {
         return Response.json({ error: "Your role cannot edit the shared intent." }, { status: 403 });
       }
       return Response.json({ room: updateIntent(roomId, parsed.data.intent) });

@@ -60,6 +60,30 @@ describe("production room boundaries", () => {
     })).toThrow(/Only the room creator/);
   });
 
+  it("stores creator-defined role powers and decision priorities", () => {
+    const created = createRoom({
+      title: "Role policy",
+      visibility: "public",
+      participant: creator,
+    });
+    const updated = updateRoomSettings(created.room.id, creator.userId, {
+      roleOverrides: {
+        qa: { priority: 95, halt: false, vote: true },
+        observer: { run: true, priority: 25 },
+      },
+    });
+
+    expect(updated.room.roleOverrides.qa).toMatchObject({
+      priority: 95,
+      halt: false,
+      vote: true,
+    });
+    expect(updated.room.roleOverrides.observer).toMatchObject({
+      run: true,
+      priority: 25,
+    });
+  });
+
   it("never includes Member Chat in AI context", () => {
     const created = createRoom({
       title: "Chat boundary",

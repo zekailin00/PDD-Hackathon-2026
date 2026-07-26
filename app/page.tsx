@@ -27,10 +27,19 @@ import type {
   RoomProgress,
   RoomVisibility,
 } from "@/lib/domain";
+import { humanizeAgentOutput } from "@/lib/presentation";
 import { ROOM_AGENT_SYSTEM } from "@/lib/prompts";
 import { downloadGeneratedJavaScript } from "@/pdd/generated-code-download";
 import type { Difficulty } from "@/pdd/model-router";
-import type { Role } from "@/pdd/role-policy";
+import {
+  DEFAULT_POLICY,
+  POWERS,
+  resolveRole,
+  voters,
+  type Power,
+  type Role,
+  type RoleEntry,
+} from "@/pdd/role-policy";
 
 const identityKey = "coprompt:identity";
 const preferencesKey = "coprompt:preferences";
@@ -104,7 +113,11 @@ const COPY = {
     memberPlaceholder: "Only room members will receive this. It is never sent to AI…",
     sendMemberChat: "Send Member Chat",
     chatSynced: "Member Chat synced; never sent to AI",
-    neverSent: "Never sent to AI · 0 tokens",
+    neverSent: "Member Chat · Never sent to AI · 0 tokens",
+    roomActivity: "Room activity & Member Chat",
+    sharedConversation: "Shared conversation",
+    conversationEmpty: "Team prompts and agent responses will appear here.",
+    artifactGenerated: "Artifact generated. Open Preview to review it.",
     liveRun: "Live run",
     defaultOutput: "Once the shared intent is ready, any authorized role can start the agent.",
     steeringPlaceholder: "What should change before the next step?",
@@ -121,15 +134,23 @@ const COPY = {
     preview: "Preview",
     generatedCode: "Generated code",
     tests: "Tests",
-    criteria: "Acceptance",
     previewEmpty: "The agent's complete HTML will be previewed here in a sandboxed window.",
     codeEmpty: "The complete generated HTML will appear here after an implementation run.",
     testsEmpty: "No test artifact yet.",
-    criteriaEmpty: "No acceptance artifact yet.",
     approvalGate: "Room approval gate",
     approvalHelp: "Download the latest generated code as a self-contained JavaScript module.",
     approve: "Approve",
     requestChanges: "Request changes",
+    approvalStatus: "Member approval status",
+    approvalStatusHelp: "Each eligible member can cast or update one vote for this proposal.",
+    notVoted: "Not voted",
+    approved: "Approved",
+    changesRequested: "Changes requested",
+    confirmApproval: "Confirm approval",
+    feedbackLabel: "What should change?",
+    feedbackPlaceholder: "Describe the change the room needs before approval…",
+    submitChanges: "Submit requested changes",
+    feedbackRequired: "Please explain the requested changes.",
     exportIssue: "Download generated code",
     reading: "Reading room",
     planning: "Planning",
@@ -141,7 +162,16 @@ const COPY = {
     waiting: "Waiting",
     nonePickedUp: "No messages picked up yet",
     allReceived: "Everyone has been heard",
-    settingsDescription: "Only the creator can change visibility, model, server-only API key, and System Prompt.",
+    settingsDescription: "Only the creator can change room settings, role powers, and decision priorities.",
+    rolePowers: "Role powers & decision priority",
+    rolePowersHelp: "Higher priority resolves conflicts in that decision domain. Disable a power to remove that role's action.",
+    decisionPriority: "Priority",
+    runPower: "Run agent",
+    steerPower: "Nudge",
+    haltPower: "Halt",
+    editIntentPower: "Edit intent",
+    votePower: "Vote",
+    openPrPower: "Export",
     newApiKey: "New API key (leave blank to keep the current server key)",
     saveSettings: "Save settings",
     settingsUpdated: "Room settings updated",
@@ -212,7 +242,11 @@ const COPY = {
     memberPlaceholder: "只傳給房間成員，不會傳給 AI…",
     sendMemberChat: "送出 Member Chat",
     chatSynced: "Member Chat 已同步；不會傳給 AI",
-    neverSent: "不會傳給 AI · 0 tokens",
+    neverSent: "Member Chat · 不會傳給 AI · 0 tokens",
+    roomActivity: "房間動態與 Member Chat",
+    sharedConversation: "共享對話",
+    conversationEmpty: "成員提示與 Agent 回覆會顯示在這裡。",
+    artifactGenerated: "產物已生成；請到「預覽」查看。",
     liveRun: "即時執行",
     defaultOutput: "共同意圖準備好後，任何有權限的角色都能啟動 agent。",
     steeringPlaceholder: "下一個步驟前要修正什麼？",
@@ -229,15 +263,23 @@ const COPY = {
     preview: "預覽",
     generatedCode: "生成程式碼",
     tests: "測試",
-    criteria: "驗收",
     previewEmpty: "Agent 產出的完整 HTML 會在這個 sandboxed sub-window 預覽。",
     codeEmpty: "執行實作意圖後，完整 HTML 程式碼會出現在這裡。",
     testsEmpty: "尚無測試產物。",
-    criteriaEmpty: "尚無驗收產物。",
     approvalGate: "房間核准關卡",
     approvalHelp: "將最新生成程式碼下載成自包含的 JavaScript 模組。",
     approve: "核准",
     requestChanges: "要求修改",
+    approvalStatus: "成員核准狀態",
+    approvalStatusHelp: "每位符合資格的成員可針對此提案投票或更新一次投票。",
+    notVoted: "尚未投票",
+    approved: "已核准",
+    changesRequested: "要求修改",
+    confirmApproval: "確認核准",
+    feedbackLabel: "需要修改什麼？",
+    feedbackPlaceholder: "描述房間核准前需要完成的修改…",
+    submitChanges: "送出修改要求",
+    feedbackRequired: "請說明需要修改的內容。",
     exportIssue: "下載生成程式碼",
     reading: "讀取房間",
     planning: "擬定計畫",
@@ -249,7 +291,16 @@ const COPY = {
     waiting: "未讀取",
     nonePickedUp: "尚未讀取任何人的訊息",
     allReceived: "全部都收到了",
-    settingsDescription: "只有建立者可修改公開性、模型、server-only API key 與 System Prompt。",
+    settingsDescription: "只有建立者可修改房間設定、角色權限與決策優先級。",
+    rolePowers: "角色權限與決策優先級",
+    rolePowersHelp: "同一決策領域發生衝突時，優先級較高者優先；關閉權限可移除該角色的操作。",
+    decisionPriority: "優先級",
+    runPower: "執行 Agent",
+    steerPower: "Nudge",
+    haltPower: "Halt",
+    editIntentPower: "編輯意圖",
+    votePower: "投票",
+    openPrPower: "匯出",
     newApiKey: "新的 API key（留空保留目前 server key）",
     saveSettings: "儲存設定",
     settingsUpdated: "房間設定已更新",
@@ -266,6 +317,13 @@ const newId = () => {
 };
 const presenceColor = { online: "#59cf96", away: "#f2b84b", offline: "#6d707c" };
 const presenceOrder = { online: 0, away: 1, offline: 2 };
+const ROLES = ["pm", "eng", "design", "qa", "observer"] as const;
+
+function resolvedPolicy(room: Room): Record<Role, RoleEntry> {
+  return Object.fromEntries(
+    ROLES.map((role) => [role, resolveRole(role, room.roleOverrides)]),
+  ) as Record<Role, RoleEntry>;
+}
 
 function sortedParticipants(participants: Participant[]): Participant[] {
   return [...participants].sort(
@@ -313,6 +371,8 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [approvalMode, setApprovalMode] = useState<"approve" | "request_changes" | null>(null);
+  const [reviewFeedback, setReviewFeedback] = useState("");
   const lastRoomId = useRef("");
   const intentDirty = useRef(false);
   const copy = COPY[locale];
@@ -381,6 +441,7 @@ export default function Home() {
         setNotice(`${value.by} ${copy.haltedBy}`);
       } else if (value.type === "done") {
         setProgress(null);
+        setLiveOutput("");
       } else if (value.type === "error") {
         setProgress(null);
         setNotice(value.message);
@@ -414,6 +475,9 @@ export default function Home() {
     setRoom(data.room);
     setIntentDraft(data.room.intent);
     setCreatorInviteCode(data.inviteCode || "");
+    setNotice("");
+    setLiveOutput("");
+    setProgress(null);
     setApiKey("");
     setProjectZip(null);
     const invite = data.room.visibility === "private" ? data.inviteCode || urlInviteCode : "";
@@ -543,12 +607,21 @@ export default function Home() {
     }
   };
 
-  const vote = async (verdict: "approve" | "request_changes") => {
+  const vote = async (verdict: "approve" | "request_changes", feedback?: string) => {
     const runId = [...(room?.runs || [])].reverse().find((item) => item.status === "proposed")?.id;
     if (!room || !runId) return setNotice(copy.noProposal);
-    const response = await fetch(`/api/rooms/${room.id}/votes`, authorized(token, { runId, verdict }));
+    if (verdict === "request_changes" && !feedback?.trim()) return setNotice(copy.feedbackRequired);
+    const response = await fetch(`/api/rooms/${room.id}/votes`, authorized(token, {
+      runId,
+      verdict,
+      feedback: feedback?.trim() || undefined,
+    }));
     const data = await response.json();
     setNotice(response.ok ? data.quorum.reason : data.error);
+    if (response.ok) {
+      setApprovalMode(null);
+      setReviewFeedback("");
+    }
   };
 
   const exportIssue = () => {
@@ -636,14 +709,14 @@ export default function Home() {
             setIntentDraft(event.target.value);
           }} disabled={room.state === "RUNNING"} />
           <Separator size="4" />
-          <ParticipantRoster participants={room.participants} meId={identity.userId} copy={copy} />
+          <ParticipantRoster room={room} meId={identity.userId} copy={copy} />
           <Separator size="4" />
           <Flex justify="between" align="center">
-            <Text size="1" color="gray" weight="bold">MEMBER CHAT</Text>
+            <Text size="1" color="gray" weight="bold">{copy.roomActivity}</Text>
             <Badge color="green" variant="soft">{copy.neverSent}</Badge>
           </Flex>
           <Box className="room-messages">{room.messages
-            .filter((message) => message.kind === "member" || message.kind === "system")
+            .filter((message) => message.kind !== "agent")
             .slice(-20)
             .map((message) => {
               const parent = message.replyTo
@@ -651,7 +724,12 @@ export default function Home() {
                 : undefined;
               return <Box key={message.id} className={`room-message${parent ? " is-reply" : ""}${message.role === "agent" ? " by-agent" : ""}`}>
                 <Flex justify="between" align="center">
-                  <Text size="1" weight="bold">{message.authorName} · {message.role.toUpperCase()}</Text>
+                  <Flex align="center" gap="2">
+                    <Text size="1" weight="bold">{message.authorName} · {message.role.toUpperCase()}</Text>
+                    <Badge color={message.kind === "review" ? "violet" : message.kind === "prompt" || message.kind === "steer" ? "amber" : "gray"}>
+                      {messageKindLabel(message.kind)}
+                    </Badge>
+                  </Flex>
                   {message.kind === "member" && <Button size="1" variant="ghost" onClick={() => setReplyTo(message.id)}>{copy.reply}</Button>}
                 </Flex>
                 {parent && <Box className="thread-quote">↳ {copy.reply} {parent.authorName}: {parent.content.slice(0, 70)}{parent.content.length > 70 ? "…" : ""}</Box>}
@@ -679,7 +757,12 @@ export default function Home() {
           </Flex>
           {notice && <Card className="notice"><Text size="2">{notice}</Text></Card>}
           {progress && <ProgressPanel progress={progress} meId={identity.userId} copy={copy} />}
-          <Box className="stream-output"><pre>{liveOutput || latestOutput(room) || copy.defaultOutput}</pre></Box>
+          <ConversationPanel
+            room={room}
+            liveOutput={liveOutput}
+            meId={identity.userId}
+            copy={copy}
+          />
           {room.state === "RUNNING" ? <Card className="steer-box">
             <Text size="2" weight="bold">Steering Queue</Text>
             <TextArea
@@ -710,7 +793,7 @@ export default function Home() {
           </Card>}
         </section>
 
-        <ArtifactPanel room={room} onVote={vote} onExport={exportIssue} copy={copy} />
+        <ArtifactPanel room={room} onOpenApproval={setApprovalMode} onExport={exportIssue} copy={copy} />
       </section>
 
       <RoomSettingsDialog
@@ -723,6 +806,22 @@ export default function Home() {
           if (invite) setCreatorInviteCode(invite);
         }}
         setNotice={setNotice}
+        copy={copy}
+      />
+      <ApprovalDialog
+        open={approvalMode !== null}
+        mode={approvalMode}
+        onOpenChange={(open) => {
+          if (!open) {
+            setApprovalMode(null);
+            setReviewFeedback("");
+          }
+        }}
+        room={room}
+        meId={identity.userId}
+        feedback={reviewFeedback}
+        setFeedback={setReviewFeedback}
+        onSubmit={vote}
         copy={copy}
       />
     </main>}
@@ -814,11 +913,87 @@ function ProgressPanel({ progress, meId, copy }: { progress: RoomProgress; meId:
   </Card>;
 }
 
-function latestOutput(room: Room) {
-  return [...room.runs].reverse().find((run) => run.output)?.output || "";
+function messageKindLabel(kind: Room["messages"][number]["kind"]): string {
+  const labels: Record<Room["messages"][number]["kind"], string> = {
+    prompt: "PROMPT",
+    member: "CHAT",
+    steer: "STEER",
+    agent: "AGENT",
+    question: "QUESTION",
+    answer: "ANSWER",
+    review: "REVIEW",
+    system: "SYSTEM",
+  };
+  return labels[kind];
 }
 
-function ArtifactPanel({ room, onVote, onExport, copy }: { room: Room; onVote: (vote: "approve" | "request_changes") => void; onExport: () => void; copy: Copy }) {
+function powerLabel(power: Power, copy: Copy): string {
+  return {
+    run: copy.runPower,
+    steer: copy.steerPower,
+    halt: copy.haltPower,
+    edit_intent: copy.editIntentPower,
+    vote: copy.votePower,
+    open_pr: copy.openPrPower,
+  }[power];
+}
+
+function ConversationPanel(props: {
+  room: Room;
+  liveOutput: string;
+  meId: string;
+  copy: Copy;
+}) {
+  const visibleKinds = new Set<Room["messages"][number]["kind"]>([
+    "prompt",
+    "steer",
+    "agent",
+    "question",
+    "answer",
+    "review",
+  ]);
+  const messages = props.room.messages.filter((message) => visibleKinds.has(message.kind)).slice(-30);
+  const liveText = props.room.state === "RUNNING" ? humanizeAgentOutput(props.liveOutput) : "";
+
+  return <Box className="conversation-feed" aria-label={props.copy.sharedConversation}>
+    {!messages.length && !liveText && <Empty text={props.copy.conversationEmpty} />}
+    {messages.map((message) => {
+      const fromAgent = message.role === "agent";
+      const content = fromAgent ? humanizeAgentOutput(message.content) : message.content;
+      if (!content) return null;
+      return <Box
+        key={message.id}
+        className={`conversation-message ${fromAgent ? "from-agent" : "from-human"}`}
+      >
+        <Flex className="conversation-meta" align="center" gap="2">
+          <Text size="1" weight="bold">
+            {message.authorName}{message.userId === props.meId ? ` (${props.copy.you})` : ""}
+          </Text>
+          <Badge color={fromAgent ? "cyan" : message.kind === "review" ? "violet" : "amber"}>
+            {messageKindLabel(message.kind)}
+          </Badge>
+        </Flex>
+        <Text as="p" size="2" className="conversation-body">
+          {content || props.copy.artifactGenerated}
+        </Text>
+      </Box>;
+    })}
+    {liveText && <Box className="conversation-message from-agent is-streaming">
+      <Flex className="conversation-meta" align="center" gap="2">
+        <Text size="1" weight="bold">CoPrompt agent</Text>
+        <Badge color="cyan">LIVE</Badge>
+      </Flex>
+      <Text as="p" size="2" className="conversation-body">{liveText}</Text>
+    </Box>}
+  </Box>;
+}
+
+function ArtifactPanel({ room, onOpenApproval, onExport, copy }: {
+  room: Room;
+  onOpenApproval: (mode: "approve" | "request_changes") => void;
+  onExport: () => void;
+  copy: Copy;
+}) {
   const latest = (kind: Artifact["kind"]) => [...room.artifacts].reverse().find((item) => item.kind === kind);
   const html = latest("html");
   const latestRun = room.runs.at(-1);
@@ -832,12 +1007,11 @@ function ArtifactPanel({ room, onVote, onExport, copy }: { room: Room; onVote: (
   return <section className="artifact-panel">
     <Flex justify="between" align="center"><Box><Text size="1" color="gray" weight="bold">TEST CAPITAL</Text><Heading size="4">{copy.artifactsApproval}</Heading></Box>{html && <Badge>v{html.version}</Badge>}</Flex>
     <Tabs.Root defaultValue="preview">
-      <Tabs.List><Tabs.Trigger value="preview">{copy.preview}</Tabs.Trigger><Tabs.Trigger value="code">{copy.generatedCode}</Tabs.Trigger><Tabs.Trigger value="tests">{copy.tests}</Tabs.Trigger><Tabs.Trigger value="criteria">{copy.criteria}</Tabs.Trigger></Tabs.List>
+      <Tabs.List><Tabs.Trigger value="preview">{copy.preview}</Tabs.Trigger><Tabs.Trigger value="code">{copy.generatedCode}</Tabs.Trigger><Tabs.Trigger value="tests">{copy.tests}</Tabs.Trigger></Tabs.List>
       <Box className="artifact-body">
         <Tabs.Content value="preview">{html ? <iframe key={html.id} title="Generated artifact" sandbox="allow-scripts" srcDoc={html.content} /> : <Empty text={copy.previewEmpty} />}</Tabs.Content>
         <Tabs.Content value="code">{html ? <pre className="generated-code">{html.content}</pre> : <Empty text={copy.codeEmpty} />}</Tabs.Content>
         <Tabs.Content value="tests"><pre>{latest("tests")?.content || copy.testsEmpty}</pre></Tabs.Content>
-        <Tabs.Content value="criteria"><pre>{latest("criteria")?.content || copy.criteriaEmpty}</pre></Tabs.Content>
       </Box>
     </Tabs.Root>
     <Card className="approval-box">
@@ -846,7 +1020,7 @@ function ArtifactPanel({ room, onVote, onExport, copy }: { room: Room; onVote: (
         {room.memoryEnabled && memoryStatus && <Badge color={latestRun?.memoryStatus === "error" ? "red" : "green"}>{memoryStatus}</Badge>}
       </Flex>
       <Text as="p" size="1" color="gray">{copy.approvalHelp}</Text>
-      <Flex gap="2" wrap="wrap"><Button size="1" color="green" onClick={() => onVote("approve")}>{copy.approve}</Button><Button size="1" color="red" variant="soft" onClick={() => onVote("request_changes")}>{copy.requestChanges}</Button><Button size="1" variant="outline" onClick={onExport}>{copy.exportIssue}</Button></Flex>
+      <Flex gap="2" wrap="wrap"><Button size="1" color="green" onClick={() => onOpenApproval("approve")}>{copy.approve}</Button><Button size="1" color="red" variant="soft" onClick={() => onOpenApproval("request_changes")}>{copy.requestChanges}</Button><Button size="1" variant="outline" onClick={onExport}>{copy.exportIssue}</Button></Flex>
     </Card>
   </section>;
 }
@@ -855,7 +1029,7 @@ function Empty({ text }: { text: string }) {
   return <Box className="empty"><Text size="2" color="gray">{text}</Text></Box>;
 }
 
-function ParticipantRoster(props: { participants: Participant[]; meId: string; copy: Copy }) {
+function ParticipantRoster(props: { room: Room; meId: string; copy: Copy }) {
   const statusLabel = {
     online: props.copy.online,
     away: props.copy.away,
@@ -864,21 +1038,92 @@ function ParticipantRoster(props: { participants: Participant[]; meId: string; c
   return <Box className="participant-roster">
     <Flex justify="between" align="center">
       <Text size="1" color="gray" weight="bold">{props.copy.roomMembers}</Text>
-      <Badge color="gray">{props.participants.length} {props.copy.joined}</Badge>
+      <Badge color="gray">{props.room.participants.length} {props.copy.joined}</Badge>
     </Flex>
     <Flex className="participant-list" wrap="wrap" gap="2">
-      {sortedParticipants(props.participants).map((person) => <Box key={person.userId} className={`participant-chip is-${person.status}`}>
+      {sortedParticipants(props.room.participants).map((person) => <Box key={person.userId} className={`participant-chip is-${person.status}`}>
         <Box className="presence-avatar">
           <MemberAvatar person={person} />
           <span className="presence-dot" style={{ background: presenceColor[person.status] }} />
         </Box>
         <Box className="participant-copy">
           <Text size="1" weight="bold">{person.name}{person.userId === props.meId ? ` (${props.copy.you})` : ""}</Text>
-          <Text size="1">{person.role.toUpperCase()} · {statusLabel[person.status]}</Text>
+          <Text size="1">{person.role.toUpperCase()} · P{resolveRole(person.role, props.room.roleOverrides).priority} · {statusLabel[person.status]}</Text>
         </Box>
       </Box>)}
     </Flex>
   </Box>;
+}
+
+function ApprovalDialog(props: {
+  open: boolean;
+  mode: "approve" | "request_changes" | null;
+  onOpenChange: (value: boolean) => void;
+  room: Room;
+  meId: string;
+  feedback: string;
+  setFeedback: (value: string) => void;
+  onSubmit: (verdict: "approve" | "request_changes", feedback?: string) => void;
+  copy: Copy;
+}) {
+  const run = [...props.room.runs].reverse().find((item) => item.status === "proposed");
+  const eligibleIds = new Set(voters(props.room.participants, props.room.roleOverrides));
+  const eligible = sortedParticipants(props.room.participants).filter((person) => eligibleIds.has(person.userId));
+  const voteByUser = new Map(
+    props.room.votes
+      .filter((vote) => vote.runId === run?.id)
+      .map((vote) => [vote.userId, vote]),
+  );
+  const myEligible = eligibleIds.has(props.meId);
+
+  return <Dialog.Root open={props.open} onOpenChange={props.onOpenChange}>
+    <Dialog.Content maxWidth="560px">
+      <Dialog.Title>{props.copy.approvalStatus}</Dialog.Title>
+      <Dialog.Description size="2">{props.copy.approvalStatusHelp}</Dialog.Description>
+      <Box className="approval-roster" mt="4">
+        {eligible.map((person) => {
+          const vote = voteByUser.get(person.userId);
+          const label = vote?.verdict === "approve"
+            ? props.copy.approved
+            : vote?.verdict === "request_changes"
+              ? props.copy.changesRequested
+              : props.copy.notVoted;
+          return <Flex key={person.userId} className="vote-row" justify="between" align="center" gap="3">
+            <Flex align="center" gap="2">
+              <MemberAvatar person={person} />
+              <Box>
+                <Text as="div" size="2" weight="bold">
+                  {person.name}{person.userId === props.meId ? ` (${props.copy.you})` : ""}
+                </Text>
+                <Text as="div" size="1" color="gray">
+                  {person.role.toUpperCase()} · P{resolveRole(person.role, props.room.roleOverrides).priority}
+                </Text>
+              </Box>
+            </Flex>
+            <Badge color={vote?.verdict === "approve" ? "green" : vote ? "red" : "gray"}>{label}</Badge>
+          </Flex>;
+        })}
+      </Box>
+      {props.mode === "request_changes" && <Box className="feedback-field" mt="4">
+        <label className="field-label" htmlFor="review-feedback">{props.copy.feedbackLabel}</label>
+        <TextArea
+          id="review-feedback"
+          value={props.feedback}
+          onChange={(event) => props.setFeedback(event.target.value)}
+          onKeyDown={(event) => submitOnEnter(event, () => {
+            if (myEligible && props.feedback.trim()) props.onSubmit("request_changes", props.feedback);
+          })}
+          placeholder={props.copy.feedbackPlaceholder}
+        />
+      </Box>}
+      <Flex justify="end" gap="2" mt="5">
+        <Dialog.Close><Button variant="soft" color="gray">{props.copy.cancel}</Button></Dialog.Close>
+        {props.mode === "approve"
+          ? <Button color="green" disabled={!run || !myEligible} onClick={() => props.onSubmit("approve")}>{props.copy.confirmApproval}</Button>
+          : <Button color="red" disabled={!run || !myEligible || !props.feedback.trim()} onClick={() => props.onSubmit("request_changes", props.feedback)}>{props.copy.submitChanges}</Button>}
+      </Flex>
+    </Dialog.Content>
+  </Dialog.Root>;
 }
 
 function MemberAvatar({ person, showTitle = false }: { person: Participant; showTitle?: boolean }) {
@@ -1050,6 +1295,7 @@ function RoomSettingsDialog(props: {
   const [systemPrompt, setSystemPrompt] = useState(props.room.systemPrompt);
   const [memoryEnabled, setMemoryEnabled] = useState(props.room.memoryEnabled);
   const [apiKey, setApiKey] = useState("");
+  const [rolePolicy, setRolePolicy] = useState<Record<Role, RoleEntry>>(() => resolvedPolicy(props.room));
 
   useEffect(() => {
     if (!props.open) return;
@@ -1059,6 +1305,7 @@ function RoomSettingsDialog(props: {
     setSystemPrompt(props.room.systemPrompt);
     setMemoryEnabled(props.room.memoryEnabled);
     setApiKey("");
+    setRolePolicy(resolvedPolicy(props.room));
   }, [
     props.open,
     props.room.id,
@@ -1067,6 +1314,7 @@ function RoomSettingsDialog(props: {
     props.room.preferredModel,
     props.room.systemPrompt,
     props.room.memoryEnabled,
+    props.room.roleOverrides,
   ]);
 
   const save = async () => {
@@ -1077,6 +1325,7 @@ function RoomSettingsDialog(props: {
       preferredModel,
       systemPrompt,
       memoryEnabled,
+      roleOverrides: rolePolicy,
       ...(apiKey.trim() ? { apiKey, baseUrl: "https://api.tokenrouter.com/v1" } : {}),
     }, "PATCH"));
     const data = await response.json();
@@ -1087,7 +1336,7 @@ function RoomSettingsDialog(props: {
   };
 
   return <Dialog.Root open={props.open} onOpenChange={props.onOpenChange}>
-    <Dialog.Content maxWidth="620px">
+    <Dialog.Content maxWidth="820px">
       <Dialog.Title>{props.copy.roomSettings}</Dialog.Title>
       <Dialog.Description size="2">{props.copy.settingsDescription}</Dialog.Description>
       <Flex direction="column" gap="3" mt="4">
@@ -1118,6 +1367,46 @@ function RoomSettingsDialog(props: {
             value={systemPrompt}
             onChange={(event) => setSystemPrompt(event.target.value)}
           />
+        </Box>
+        <Box className="role-policy">
+          <Heading size="3">{props.copy.rolePowers}</Heading>
+          <Text as="p" size="1" color="gray">{props.copy.rolePowersHelp}</Text>
+          <Box className="role-policy-grid" mt="3">
+            {ROLES.map((role) => <Box key={role} className="role-policy-row">
+              <Flex className="role-policy-head" justify="between" align="center" gap="3">
+                <Text weight="bold">{role.toUpperCase()}</Text>
+                <label className="priority-field">
+                  <span>{props.copy.decisionPriority}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={rolePolicy[role].priority}
+                    onChange={(event) => {
+                      const priority = Math.max(0, Math.min(100, Number(event.target.value) || 0));
+                      setRolePolicy((current) => ({
+                        ...current,
+                        [role]: { ...current[role], priority },
+                      }));
+                    }}
+                  />
+                </label>
+              </Flex>
+              <Flex className="power-list" wrap="wrap" gap="2" mt="2">
+                {POWERS.map((power) => <label key={power} className="power-toggle">
+                  <input
+                    type="checkbox"
+                    checked={rolePolicy[role][power]}
+                    onChange={(event) => setRolePolicy((current) => ({
+                      ...current,
+                      [role]: { ...current[role], [power]: event.target.checked },
+                    }))}
+                  />
+                  <span>{powerLabel(power, props.copy)}</span>
+                </label>)}
+              </Flex>
+            </Box>)}
+          </Box>
         </Box>
       </Flex>
       <Flex justify="end" gap="2" mt="5"><Dialog.Close><Button variant="soft" color="gray">{props.copy.cancel}</Button></Dialog.Close><Button onClick={save}>{props.copy.saveSettings}</Button></Flex>

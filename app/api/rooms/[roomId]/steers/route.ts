@@ -19,10 +19,12 @@ export async function POST(request: Request, context: { params: Promise<{ roomId
     const parsed = schema.safeParse(await request.json());
     if (!parsed.success) return Response.json({ error: "The steering request is invalid." }, { status: 400 });
     const power = parsed.data.kind === "halt" ? "halt" : "steer";
-    if (!can(identity.role, power)) return Response.json({ error: `Your role cannot ${power} this run.` }, { status: 403 });
     const room = getRoom(roomId);
     if (!room || !["RUNNING", "AWAITING_INPUT"].includes(room.state)) {
       return Response.json({ error: "There is no active agent run." }, { status: 409 });
+    }
+    if (!can(identity.role, power, room.roleOverrides)) {
+      return Response.json({ error: `Your role cannot ${power} this run.` }, { status: 403 });
     }
     const steer = queueSteer(roomId, {
       ...parsed.data,

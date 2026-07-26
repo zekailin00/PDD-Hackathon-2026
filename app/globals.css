@@ -371,21 +371,60 @@ body {
 }
 .notice .rt-Text { color: var(--ink) !important; font-weight: 600; }
 
-.stream-output {
+.conversation-feed {
   flex: 1;
   min-height: 200px;
   overflow: auto;
   border: var(--border);
   border-radius: 8px;
-  background: var(--screen);
+  padding: 14px;
+  background:
+    radial-gradient(circle at 1px 1px, var(--grid-dot) 1px, transparent 0),
+    var(--cream-2);
+  background-size: 18px 18px;
   box-shadow: var(--shadow);
 }
 
-.stream-output pre {
+.conversation-message {
+  width: fit-content;
+  max-width: 88%;
+  margin-bottom: 12px;
+  padding: 11px 13px;
+  border: var(--border-thin);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+}
+
+.conversation-message.from-human {
+  margin-left: auto;
+  border-bottom-right-radius: 2px;
+  background: var(--steer);
+}
+
+.conversation-message.from-agent {
+  margin-right: auto;
+  border-left: 6px solid var(--teal);
+  border-bottom-left-radius: 2px;
+}
+
+.conversation-message.is-streaming {
+  animation: conversationPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes conversationPulse {
+  50% { border-left-color: var(--mustard); }
+}
+
+.conversation-meta {
+  margin-bottom: 6px;
+}
+
+.conversation-body {
+  display: block;
   margin: 0;
-  padding: 16px;
-  color: #7dd88f;                       /* phosphor green on a dark tube */
-  font: 12.5px/1.75 "Space Mono", monospace;
+  color: var(--ink) !important;
+  line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -755,6 +794,83 @@ body {
 .empty .rt-Text { color: var(--brown) !important; font-style: italic; }
 
 .approval-box { margin-top: auto; background: var(--approval) !important; border-color: var(--avocado) !important; }
+
+.approval-roster {
+  max-height: 300px;
+  overflow: auto;
+  border: var(--border-thin);
+  border-radius: 7px;
+  background: var(--cream-2);
+}
+
+.vote-row {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--pattern);
+}
+
+.vote-row:last-child { border-bottom: 0; }
+
+.feedback-field textarea {
+  min-height: 110px;
+  border: var(--border-thin) !important;
+  background: var(--paper) !important;
+  color: var(--ink) !important;
+}
+
+.role-policy {
+  padding-top: 6px;
+  border-top: var(--border-thin);
+}
+
+.role-policy-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.role-policy-row {
+  padding: 11px 12px;
+  border: var(--border-thin);
+  border-radius: 7px;
+  background: var(--cream-2);
+}
+
+.priority-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.priority-field input {
+  width: 68px;
+  padding: 5px 7px;
+  border: var(--border-thin);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 700 12px "Space Mono", monospace;
+}
+
+.power-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.power-toggle input {
+  accent-color: var(--teal);
+  cursor: pointer;
+}
 
 /* -------------------------------------------------------------- welcome -- */
 

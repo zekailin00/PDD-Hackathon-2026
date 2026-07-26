@@ -17,10 +17,12 @@ ships only what the room approves.**
 1. Open the [live demo](https://coprompt-ai.onrender.com) in two browser windows.
 2. Join the public **Demo** room with two different names and roles.
 3. Edit the shared intent, start one run, then send a **NUDGE** from the other
-   window while the run is active.
-4. Review the same streamed progress and generated artifact in both windows.
-5. Approve from every voting member, then export the approved result as a
-   structured GitHub **PDD Issue**.
+   window while the run is active. Every prompt and action appears in room
+   activity.
+4. Review the same conversation-style agent response, streamed progress, and
+   generated artifact in both windows.
+5. Open the approval panel to inspect every eligible member's vote. Submit one
+   change request and confirm its feedback appears in room activity.
 6. Open [PDD_EVIDENCE.md](PDD_EVIDENCE.md) to see the prompt → artifact →
    production call site → acceptance test chain and the evidence-led iteration.
 
@@ -42,11 +44,13 @@ shared product decision into a reviewable implementation.
 CoPrompt adds the missing collaboration and governance layer around an AI run:
 
 - one shared intent and one server-side agent run;
-- visible participant roles, presence, and per-person contribution state;
+- visible participant roles, presence, decision priority, and per-person
+  contribution state;
 - mid-run NUDGE/HALT steering consumed at explicit checkpoints;
 - Member Chat that is never sent to the model and uses zero AI tokens;
+- conversation-first shared run with code kept in a dedicated technical tab;
 - browser-ready artifact preview, generated code, criteria, and tests;
-- server-enforced role powers and unanimous room approval;
+- creator-configurable, server-enforced role powers and unanimous room approval;
 - approved PDD Issue export to GitHub;
 - optional Mem0 recall of approved room decisions only.
 
@@ -56,16 +60,17 @@ team-owned, inspectable asset and makes agreement an executable shipping gate.
 ## What we built today
 
 - English-first interface with Traditional Chinese switch and light/dark mode.
-- Public and private rooms, invite links, creator settings, and role lanes.
+- Public and private rooms, invite links, creator settings, configurable role
+  powers, and decision priorities.
 - Optional project ZIP context, bounded and read server-side only.
 - TokenRouter live-catalog model selection with deterministic non-Opus routing.
 - One SSE room stream for presence, progress, steering, artifacts, and votes.
 - Three-phase AI execution with visible “picked up” versus “waiting” feedback.
-- HTML preview/code, generated TypeScript download, acceptance criteria, tests,
-  versioned artifacts, and approval state.
+- HTML preview/code, generated JavaScript download, acceptance criteria, tests,
+  versioned artifacts, and a per-member approval status panel.
 - Server-side quorum and role checks before GitHub PDD Issue export.
 - Opt-in Mem0 room memory written only after approval.
-- Six prompt-owned TypeScript decision artifacts with acceptance tests.
+- Six prompt-owned decision artifacts with acceptance tests.
 
 ## PDD method and traceability
 
@@ -79,7 +84,7 @@ followed by regeneration and tests—not in an untracked artifact patch.
 | Approval quorum | [`prompts/approval_quorum_typescript.prompt`](prompts/approval_quorum_typescript.prompt) | [`pdd/approval-quorum.ts`](pdd/approval-quorum.ts) | vote and export API routes | [`tests/approval-quorum.test.ts`](tests/approval-quorum.test.ts) |
 | Role powers | [`prompts/role_policy_typescript.prompt`](prompts/role_policy_typescript.prompt) | [`pdd/role-policy.ts`](pdd/role-policy.ts) | agent, vote, and export gates | [`tests/role-policy.test.ts`](tests/role-policy.test.ts) |
 | Model choice | [`prompts/model_router_typescript.prompt`](prompts/model_router_typescript.prompt) | [`pdd/model-router.ts`](pdd/model-router.ts) | [`lib/server/tokenrouter.ts`](lib/server/tokenrouter.ts) | [`tests/model-router.test.ts`](tests/model-router.test.ts) |
-| Code download | [`prompts/generated_code_download_typescript.prompt`](prompts/generated_code_download_typescript.prompt) | [`pdd/generated-code-download.ts`](pdd/generated-code-download.ts) | [`app/page.tsx`](app/page.tsx) | [`tests/generated-code-download.test.ts`](tests/generated-code-download.test.ts) |
+| Code download | [`prompts/generated_code_download_javascript.prompt`](prompts/generated_code_download_javascript.prompt) | [`pdd/generated-code-download.ts`](pdd/generated-code-download.ts) | [`app/page.tsx`](app/page.tsx) | [`tests/generated-code-download.test.ts`](tests/generated-code-download.test.ts) |
 
 The strongest documented iteration is preserved in Git history:
 

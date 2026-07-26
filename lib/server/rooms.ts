@@ -14,7 +14,7 @@ import type {
 } from "@/lib/domain";
 import { ROOM_AGENT_SYSTEM } from "@/lib/prompts";
 import type { Difficulty } from "@/pdd/model-router";
-import type { Role } from "@/pdd/role-policy";
+import type { Role, RoleOverrides } from "@/pdd/role-policy";
 
 type Listener = (event: RoomEvent) => void;
 type RoomSecret = { inviteCode: string; apiKey?: string; baseUrl?: string };
@@ -102,6 +102,7 @@ function seedDemoRoom(): void {
     systemPrompt: ROOM_AGENT_SYSTEM,
     memoryEnabled: false,
     preferredModel: "",
+    roleOverrides: {},
     isDemo: true,
     state: "PROPOSED",
     intent: "## Goal\nCreate a clear launch checklist the whole room can review.\n\n## Acceptance criteria\n1. The artifact renders directly in the browser preview.\n2. The page contains three launch checklist items.\n3. Tests match the acceptance criteria.\n\n## Must not\n- Do not call external APIs.\n- Do not expose API keys or other secrets.\n",
@@ -213,7 +214,9 @@ function seedDemoRoom(): void {
 seedDemoRoom();
 
 export function getRoom(roomId: string): Room | undefined {
-  return store.rooms.get(cleanRoomId(roomId));
+  const room = store.rooms.get(cleanRoomId(roomId));
+  if (room) room.roleOverrides ??= {};
+  return room;
 }
 
 export function listPublicRooms(): PublicRoom[] {
@@ -255,6 +258,7 @@ export function createRoom(input: {
     systemPrompt: input.systemPrompt?.trim().slice(0, 20_000) || ROOM_AGENT_SYSTEM,
     memoryEnabled: input.memoryEnabled ?? false,
     preferredModel: input.preferredModel?.trim().slice(0, 200) || "",
+    roleOverrides: {},
     sourceArchive: input.sourceArchive ? {
       name: input.sourceArchive.name,
       fileCount: input.sourceArchive.fileCount,
@@ -320,6 +324,7 @@ export function updateRoomSettings(
     systemPrompt?: string;
     memoryEnabled?: boolean;
     preferredModel?: string;
+    roleOverrides?: RoleOverrides;
     apiKey?: string;
     baseUrl?: string;
   },
@@ -332,6 +337,7 @@ export function updateRoomSettings(
   if (patch.systemPrompt !== undefined) room.systemPrompt = patch.systemPrompt.trim().slice(0, 20_000) || ROOM_AGENT_SYSTEM;
   if (patch.memoryEnabled !== undefined) room.memoryEnabled = patch.memoryEnabled;
   if (patch.preferredModel !== undefined) room.preferredModel = patch.preferredModel.trim().slice(0, 200);
+  if (patch.roleOverrides !== undefined) room.roleOverrides = structuredClone(patch.roleOverrides);
   const secret = store.secrets.get(room.id) ?? { inviteCode: inviteCode() };
   if (patch.apiKey !== undefined) secret.apiKey = patch.apiKey.trim() || undefined;
   if (patch.baseUrl !== undefined) secret.baseUrl = patch.baseUrl.trim() || undefined;

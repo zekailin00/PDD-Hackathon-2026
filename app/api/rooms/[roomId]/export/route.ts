@@ -9,12 +9,14 @@ export async function POST(request: Request, context: { params: Promise<{ roomId
   const { roomId } = await context.params;
   try {
     const identity = verifyIdentity(request, roomId);
-    if (!can(identity.role, "open_pr")) return Response.json({ error: "Your role cannot export a PDD Issue." }, { status: 403 });
     const room = getRoom(roomId);
     if (!room) return Response.json({ error: "Room not found." }, { status: 404 });
+    if (!can(identity.role, "open_pr", room.roleOverrides)) {
+      return Response.json({ error: "Your role cannot export a PDD Issue." }, { status: 403 });
+    }
     const run = [...room.runs].reverse().find((item) => item.status === "proposed");
     if (!run) return Response.json({ error: "There is no proposal available to export." }, { status: 409 });
-    const electorate = voters(room.participants);
+    const electorate = voters(room.participants, room.roleOverrides);
     const quorum = evaluateQuorum(electorate, room.votes.filter((vote) => vote.runId === run.id));
     if (!quorum.canOpenPr) return Response.json({ error: quorum.reason, quorum }, { status: 409 });
 

@@ -1,6 +1,6 @@
 import type { AgentPhase, Room, RoomProgress } from "@/lib/domain";
 import { HTML_BLOCK_BEGIN, HTML_BLOCK_END, HTML_OUTPUT_PROTOCOL, ROLE_LENS, ROOM_AGENT_SYSTEM } from "@/lib/prompts";
-import { can } from "@/pdd/role-policy";
+import { can, resolveRole } from "@/pdd/role-policy";
 import { splitTokens } from "@/pdd/token-split";
 import {
   addArtifact, addMessage, consumeSteers, finishRun, getRoom, markMessagesSeen, publish,
@@ -64,7 +64,10 @@ export function reportProgress(input: {
 
 function roleContext(room: Room): string {
   return room.participants
-    .map((person) => `${person.name} [${person.role.toUpperCase()}]: ${ROLE_LENS[person.role]}`)
+    .map((person) => {
+      const policy = resolveRole(person.role, room.roleOverrides);
+      return `${person.name} [${person.role.toUpperCase()}, priority ${policy.priority}]: ${ROLE_LENS[person.role]}`;
+    })
     .join("\n");
 }
 
@@ -118,9 +121,11 @@ export async function executeRoomAgent(input: {
   difficulty: Difficulty;
   prefer?: string;
 }): Promise<string> {
-  if (!can(input.identity.role, "run")) throw new Error("Your role cannot start the agent.");
   let room = getRoom(input.roomId);
   if (!room) throw new Error("Room not found.");
+  if (!can(input.identity.role, "run", room.roleOverrides)) {
+    throw new Error("Your role cannot start the agent.");
+  }
 
   const run = startRun(input.roomId, input.identity.userId, input.difficulty);
   addMessage(input.roomId, {
@@ -128,7 +133,7 @@ export async function executeRoomAgent(input: {
     userId: input.identity.userId,
     role: input.identity.role,
     kind: "prompt",
-    content: `${input.prompt}\n\n${HTML_OUTPUT_PROTOCOL}`,
+    content: input.prompt,
     runId: run.id,
   });
   try {

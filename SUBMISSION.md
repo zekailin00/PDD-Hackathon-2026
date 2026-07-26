@@ -53,9 +53,11 @@ approval-gated PDD artifact.
 
 ## What was built during the event
 
-- shared rooms, roles, presence, intent, chat, and one streamed AI run;
+- shared rooms, configurable role powers and priorities, presence, intent, room
+  activity, Member Chat, and one streamed AI run;
 - mid-run NUDGE/HALT checkpoints and visible contribution pickup;
-- browser artifact preview, criteria, tests, versioning, and code download;
+- conversation-first agent responses plus browser artifact preview, tests,
+  versioning, and code download;
 - server-enforced role and quorum gates;
 - GitHub PDD Issue export after approval;
 - optional approved-decision memory with Mem0;

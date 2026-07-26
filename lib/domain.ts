@@ -1,5 +1,5 @@
 import type { Difficulty } from "@/pdd/model-router";
-import type { Role } from "@/pdd/role-policy";
+import type { Role, RoleOverrides } from "@/pdd/role-policy";
 
 export type RoomState = "IDLE" | "RUNNING" | "AWAITING_INPUT" | "PROPOSED";
 export type RunStatus = "running" | "proposed" | "done" | "halted" | "error";
@@ -19,7 +19,7 @@ export type RoomMessage = {
   authorName: string;
   userId: string;
   role: Role | "agent";
-  kind: "prompt" | "member" | "steer" | "agent" | "question" | "answer" | "system";
+  kind: "prompt" | "member" | "steer" | "agent" | "question" | "answer" | "review" | "system";
   content: string;
   runId?: string;
   replyTo?: string;
@@ -77,6 +77,7 @@ export type Room = {
   systemPrompt: string;
   memoryEnabled: boolean;
   preferredModel?: string;
+  roleOverrides: RoleOverrides;
   sourceArchive?: {
     name: string;
     fileCount: number;
