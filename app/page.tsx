@@ -1048,7 +1048,16 @@ function ArtifactPanel({ room, onOpenApproval, onExport, copy }: {
     <Tabs.Root defaultValue="preview">
       <Tabs.List><Tabs.Trigger value="preview">{copy.preview}</Tabs.Trigger><Tabs.Trigger value="code">{copy.generatedCode}</Tabs.Trigger><Tabs.Trigger value="tests">{copy.tests}</Tabs.Trigger></Tabs.List>
       <Box className="artifact-body">
-        <Tabs.Content value="preview">{html ? <iframe key={html.id} title="Generated artifact" sandbox="allow-scripts" srcDoc={html.content} /> : <Empty text={copy.previewEmpty} />}</Tabs.Content>
+        <Tabs.Content value="preview">
+          {html
+            ? <iframe
+              key={html.id}
+              title="Generated artifact"
+              sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads"
+              srcDoc={html.content}
+            />
+            : <Empty text={copy.previewEmpty} />}
+        </Tabs.Content>
         <Tabs.Content value="code">{html ? <pre className="generated-code">{html.content}</pre> : <Empty text={copy.codeEmpty} />}</Tabs.Content>
         <Tabs.Content value="tests"><pre>{latest("tests")?.content || copy.testsEmpty}</pre></Tabs.Content>
       </Box>

@@ -816,7 +816,14 @@ body {
   box-shadow: var(--shadow);
 }
 .artifact-body .rt-TabsContent { height: 100%; }
-.artifact-body iframe { width: 100%; height: 100%; border: 0; background: #fff; }
+.artifact-body iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+  pointer-events: auto;
+}
 
 .empty {
   display: grid;
