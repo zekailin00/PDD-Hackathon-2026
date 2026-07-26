@@ -141,7 +141,30 @@ body {
   justify-content: center;
 }
 
-.presence-avatar > span {
+.member-avatar {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: var(--border-thin);
+  border-radius: 50%;
+  background: var(--orange);
+  color: var(--paper);
+  font-family: "Work Sans", Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -.02em;
+}
+
+.member-avatar.is-pm { background: var(--teal); }
+.member-avatar.is-eng { background: var(--orange); }
+.member-avatar.is-design { background: var(--cherry); }
+.member-avatar.is-qa { background: var(--avocado); }
+.member-avatar.is-observer { background: var(--brown); }
+
+.presence-dot {
   position: absolute;
   right: 0;
   bottom: 0;
@@ -151,6 +174,23 @@ body {
   height: 10px;
   border: 2px solid var(--mustard);
   border-radius: 50%;
+}
+
+.member-count-badge {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 5px;
+}
+
+.member-count-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .topbar-actions {
@@ -547,14 +587,6 @@ body {
 .radix-themes .rt-Badge[data-accent-color="green"]  { background: var(--avocado) !important; color: var(--paper) !important; }
 .radix-themes .rt-Badge[data-accent-color="violet"] { background: var(--orange) !important; color: var(--paper) !important; }
 .radix-themes .rt-Badge[data-accent-color="cyan"]   { background: var(--teal) !important; color: var(--paper) !important; }
-
-.radix-themes .rt-AvatarRoot {
-  border: var(--border-thin);
-  border-radius: 50%;
-  background: var(--orange) !important;
-  color: var(--paper) !important;
-  font-weight: 700;
-}
 
 /* --------------------------------------------------------------- inputs -- */
 

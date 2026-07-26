@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import Image from "next/image";
 import {
-  Avatar,
   Badge,
   Box,
   Button,
@@ -264,9 +263,6 @@ const newId = () => {
   const bytes = new Uint8Array(16);
   globalThis.crypto.getRandomValues(bytes);
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-};
-const roleColor: Record<Role, "indigo" | "orange" | "pink" | "green" | "gray"> = {
-  pm: "indigo", eng: "orange", design: "pink", qa: "green", observer: "gray",
 };
 const presenceColor = { online: "#59cf96", away: "#f2b84b", offline: "#6d707c" };
 const presenceOrder = { online: 0, away: 1, offline: 2 };
@@ -613,10 +609,13 @@ export default function Home() {
           <Text size="2">{room.title}</Text>
         </Flex>
         <Flex className="topbar-actions" justify="end" align="center">
-          <Badge className="member-count-badge" color="gray">👥 {room.participants.length}</Badge>
+          <Badge className="member-count-badge" color="gray">
+            <UsersIcon />
+            {room.participants.length}
+          </Badge>
           {sortedParticipants(room.participants).slice(0, 5).map((person) => <Box key={person.userId} className="presence-avatar">
-            <Avatar fallback={person.name.slice(0, 2).toUpperCase()} color={roleColor[person.role]} size="2" title={`${person.name} · ${person.role} · ${person.status}`} />
-            <span style={{ background: presenceColor[person.status] }} />
+            <MemberAvatar person={person} showTitle />
+            <span className="presence-dot" style={{ background: presenceColor[person.status] }} />
           </Box>)}
           <PreferenceControls {...{ locale, setLocale, themeMode, setThemeMode }} compact />
           <Button size="1" variant="soft" onClick={() => void navigator.clipboard.writeText(inviteUrl)}>{copy.copyInvite}</Button>
@@ -870,8 +869,8 @@ function ParticipantRoster(props: { participants: Participant[]; meId: string; c
     <Flex className="participant-list" wrap="wrap" gap="2">
       {sortedParticipants(props.participants).map((person) => <Box key={person.userId} className={`participant-chip is-${person.status}`}>
         <Box className="presence-avatar">
-          <Avatar fallback={person.name.slice(0, 2).toUpperCase()} color={roleColor[person.role]} size="2" />
-          <span style={{ background: presenceColor[person.status] }} />
+          <MemberAvatar person={person} />
+          <span className="presence-dot" style={{ background: presenceColor[person.status] }} />
         </Box>
         <Box className="participant-copy">
           <Text size="1" weight="bold">{person.name}{person.userId === props.meId ? ` (${props.copy.you})` : ""}</Text>
@@ -880,6 +879,26 @@ function ParticipantRoster(props: { participants: Participant[]; meId: string; c
       </Box>)}
     </Flex>
   </Box>;
+}
+
+function MemberAvatar({ person, showTitle = false }: { person: Participant; showTitle?: boolean }) {
+  const initials = person.name.trim().slice(0, 2).toUpperCase() || "?";
+  return <span
+    className={`member-avatar is-${person.role}`}
+    aria-label={showTitle ? `${person.name} · ${person.role} · ${person.status}` : person.name}
+    title={showTitle ? `${person.name} · ${person.role} · ${person.status}` : undefined}
+  >
+    {initials}
+  </span>;
+}
+
+function UsersIcon() {
+  return <svg className="member-count-icon" viewBox="0 0 20 20" aria-hidden="true">
+    <circle cx="7" cy="6" r="3" />
+    <path d="M1.8 16c.3-3.2 2.1-5 5.2-5s4.9 1.8 5.2 5" />
+    <circle cx="14.5" cy="7" r="2.3" />
+    <path d="M13.1 11.5c3-.6 4.8.9 5.1 3.7" />
+  </svg>;
 }
 
 function Welcome(props: {
