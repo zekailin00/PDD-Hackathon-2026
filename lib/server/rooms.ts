@@ -370,11 +370,8 @@ export function setPresence(roomId: string, userId: string, status: Presence): v
   publishSnapshot(room);
 }
 
-export function removeParticipant(roomId: string, userId: string, presenceStamp?: string): void {
+export function removeParticipant(roomId: string, userId: string): void {
   const room = requiredRoom(roomId);
-  const participant = room.participants.find((item) => item.userId === userId);
-  // Ignore a delayed close beacon from a tab that was refreshed or rejoined.
-  if (presenceStamp && participant?.lastSeenAt !== presenceStamp) return;
   room.participants = room.participants.filter((item) => item.userId !== userId);
   room.updatedAt = now();
   publish(room.id, { type: "presence", participants: room.participants });

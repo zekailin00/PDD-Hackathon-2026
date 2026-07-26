@@ -10,10 +10,12 @@ CoPrompt keeps consequential decisions as prompt-owned TypeScript artifacts:
 | Repository read boundary | `prompts/path_sandbox_typescript.prompt` | `pdd/path-sandbox.ts` | `tests/path-sandbox.test.ts` |
 | TokenRouter model choice | `prompts/model_router_typescript.prompt` | `pdd/model-router.ts` | `tests/model-router.test.ts` |
 
-Production room-boundary tests live in `tests/room-store.test.ts`. They verify
-that private rooms are not publicly listed, room API keys never appear in
-client snapshots, Member Chat is excluded from AI context, logout removes the
-member, and seed content remains isolated to the Demo room.
+Production room-boundary tests live in `tests/room-store.test.ts` and
+`tests/memory.test.ts`. They verify that private rooms are not publicly listed,
+room API keys never appear in client snapshots, Member Chat is excluded from AI
+context, logout removes the member, seed content remains isolated to the Demo
+room, memory is opt-in, and approved memories exclude chat, ZIP source,
+generated code, and credential-looking values.
 
 Run the complete gate with:
 
