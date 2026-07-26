@@ -331,6 +331,13 @@ function sortedParticipants(participants: Participant[]): Participant[] {
   );
 }
 
+function memberTone(userId: string): string {
+  if (userId === "agent") return "member-tone-agent";
+  let hash = 0;
+  for (const character of userId) hash = ((hash << 5) - hash + character.charCodeAt(0)) | 0;
+  return `member-tone-${Math.abs(hash) % 6}`;
+}
+
 type Identity = { userId: string; name: string; role: Role };
 type RoomResponse = { room: Room; token: string; inviteCode?: string; identity?: Identity; error?: string };
 
@@ -722,9 +729,13 @@ export default function Home() {
               const parent = message.replyTo
                 ? room.messages.find((item) => item.id === message.replyTo)
                 : undefined;
-              return <Box key={message.id} className={`room-message${parent ? " is-reply" : ""}${message.role === "agent" ? " by-agent" : ""}`}>
+              return <Box
+                key={message.id}
+                className={`room-message ${memberTone(message.userId)}${parent ? " is-reply" : ""}${message.role === "agent" ? " by-agent" : ""}`}
+              >
                 <Flex justify="between" align="center">
                   <Flex align="center" gap="2">
+                    <span className="room-author-dot" aria-hidden="true" />
                     <Text size="1" weight="bold">{message.authorName} · {message.role.toUpperCase()}</Text>
                     <Badge color={message.kind === "review" ? "violet" : message.kind === "prompt" || message.kind === "steer" ? "amber" : "gray"}>
                       {messageKindLabel(message.kind)}

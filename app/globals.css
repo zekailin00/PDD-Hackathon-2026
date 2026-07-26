@@ -327,13 +327,32 @@ body {
 .room-messages { flex: 1; overflow: auto; padding-right: 4px; }
 
 .room-message {
+  --member-color: var(--teal);
   margin-bottom: 9px;
   padding: 9px 11px;
   border: var(--border-thin);
-  border-left: 6px solid var(--teal);
+  border-left: 6px solid var(--member-color);
   border-radius: 5px;
-  background: var(--paper);
+  background: color-mix(in srgb, var(--member-color) 11%, var(--paper));
   box-shadow: var(--shadow-sm);
+}
+
+.room-message.member-tone-0 { --member-color: var(--teal); }
+.room-message.member-tone-1 { --member-color: var(--orange); }
+.room-message.member-tone-2 { --member-color: var(--avocado); }
+.room-message.member-tone-3 { --member-color: var(--cherry); }
+.room-message.member-tone-4 { --member-color: var(--mustard); }
+.room-message.member-tone-5 { --member-color: var(--brown); }
+.room-message.member-tone-agent { --member-color: var(--mustard); }
+
+.room-author-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  flex: 0 0 9px;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  background: var(--member-color);
 }
 
 .room-message p {
@@ -346,8 +365,9 @@ body {
 .room-message .rt-Text[size="1"] { color: var(--brown) !important; }
 
 /* A reply is the room's newer position on a point — mark it. */
-.room-message.is-reply { border-left-color: var(--orange); background: var(--reply); }
-.room-message.by-agent { border-left-color: var(--mustard); }
+.room-message.is-reply {
+  background: color-mix(in srgb, var(--member-color) 7%, var(--reply));
+}
 
 .thread-quote {
   margin: 4px 0 2px;
