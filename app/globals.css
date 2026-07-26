@@ -245,6 +245,45 @@ body {
 
 /* ----------------------------------------------------------- room chat -- */
 
+.participant-roster {
+  display: grid;
+  gap: 8px;
+}
+
+.participant-list {
+  max-height: 106px;
+  overflow-y: auto;
+  padding: 2px 4px 4px 2px;
+}
+
+.participant-chip {
+  display: flex;
+  min-width: 132px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: var(--border-thin);
+  border-radius: 7px;
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+}
+
+.participant-chip.is-offline {
+  opacity: .62;
+}
+
+.participant-copy {
+  display: grid;
+  min-width: 0;
+}
+
+.participant-copy .rt-Text {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .room-messages { flex: 1; overflow: auto; padding-right: 4px; }
 
 .room-message {
@@ -773,6 +812,7 @@ body {
   .topbar { grid-template-columns: 1fr auto; padding: 0 12px; }
   .topbar > div:nth-child(2) { display: none; }
   .topbar .presence-avatar { display: none; }
+  .participant-roster .presence-avatar { display: inline-flex; }
   .topbar-actions,
   .topbar-actions .preference-controls { gap: 8px !important; }
   .preference-controls.is-compact .rt-Button { padding-inline: 7px; }

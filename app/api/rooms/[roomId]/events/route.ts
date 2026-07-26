@@ -1,5 +1,8 @@
-import { subscribe } from "@/lib/server/rooms";
-import { setPresence } from "@/lib/server/rooms";
+import {
+  closePresenceConnection,
+  openPresenceConnection,
+  subscribe,
+} from "@/lib/server/rooms";
 import { verifyIdentity, type Identity } from "@/lib/server/auth";
 
 export const runtime = "nodejs";
@@ -10,7 +13,7 @@ export async function GET(request: Request, context: { params: Promise<{ roomId:
   let identity: Identity;
   try {
     identity = verifyIdentity(request, roomId);
-    setPresence(roomId, identity.userId, "online");
+    openPresenceConnection(roomId, identity.userId);
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Unauthorized." }, { status: 401 });
   }
@@ -21,7 +24,7 @@ export async function GET(request: Request, context: { params: Promise<{ roomId:
     if (closed) return;
     closed = true;
     unsubscribe();
-    setPresence(roomId, identity.userId, "offline");
+    closePresenceConnection(roomId, identity.userId);
   };
   const stream = new ReadableStream({
     start(controller) {

@@ -3,9 +3,22 @@ import { chooseModel, type CatalogModel, type Difficulty, type ModelChoice } fro
 const DEFAULT_BASE_URL = "https://api.tokenrouter.com/v1";
 export type ProviderConfig = { apiKey?: string; baseUrl?: string };
 
+export function tokenRouterApiKey(): string {
+  return (
+    process.env.TOKENROUTER_API_KEY
+    || process.env.TOKEN_ROUTER_API_KEY
+    || process.env.TOKENROUTER_KEY
+    || ""
+  ).trim();
+}
+
+export function isTokenRouterConfigured(): boolean {
+  return Boolean(tokenRouterApiKey());
+}
+
 function config(override: ProviderConfig = {}) {
-  const apiKey = override.apiKey || process.env.TOKENROUTER_API_KEY;
-  if (!apiKey) throw new Error("The server has not configured TOKENROUTER_API_KEY.");
+  const apiKey = override.apiKey?.trim() || tokenRouterApiKey();
+  if (!apiKey) throw new Error("AI is temporarily unavailable because the server connection is not configured.");
   return {
     apiKey,
     baseUrl: (override.baseUrl || process.env.TOKENROUTER_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, ""),

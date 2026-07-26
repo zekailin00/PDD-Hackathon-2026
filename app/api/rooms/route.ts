@@ -81,7 +81,7 @@ export async function POST(request: Request) {
         }),
         inviteCode: parsed.data.inviteCode,
       };
-    const resolved = result.room.participants.find((item) => item.name.trim().toLocaleLowerCase() === member.name.trim().toLocaleLowerCase());
+    const resolved = result.room.participants.find((item) => item.userId === member.userId);
     if (!resolved) return Response.json({ error: "Could not resolve room identity." }, { status: 500 });
     const token = issueIdentity({
       roomId: result.room.id,

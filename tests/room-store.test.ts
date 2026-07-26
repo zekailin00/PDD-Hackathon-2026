@@ -7,6 +7,8 @@ import {
   getRoomSourceContext,
   joinRoom,
   listPublicRooms,
+  closePresenceConnection,
+  openPresenceConnection,
   removeParticipant,
   setPresence,
   updateRoomSettings,
@@ -94,6 +96,36 @@ describe("production room boundaries", () => {
     expect(getRoom(created.room.id)?.participants[0].status).toBe("away");
     removeParticipant(created.room.id, creator.userId);
     expect(getRoom(created.room.id)?.participants).toHaveLength(0);
+  });
+
+  it("keeps same-name people as distinct room members", () => {
+    const created = createRoom({
+      title: "Same names",
+      visibility: "public",
+      participant: { userId: "anonymous-a", name: "Anonymous", role: "pm" },
+    });
+    joinRoom({
+      roomId: created.room.id,
+      participant: { userId: "anonymous-b", name: "Anonymous", role: "eng" },
+    });
+    expect(getRoom(created.room.id)?.participants.map((person) => person.userId).sort()).toEqual([
+      "anonymous-a",
+      "anonymous-b",
+    ]);
+  });
+
+  it("does not mark a member offline while another SSE connection remains", () => {
+    const created = createRoom({
+      title: "Presence connections",
+      visibility: "public",
+      participant: creator,
+    });
+    openPresenceConnection(created.room.id, creator.userId);
+    openPresenceConnection(created.room.id, creator.userId);
+    closePresenceConnection(created.room.id, creator.userId);
+    expect(getRoom(created.room.id)?.participants[0].status).toBe("online");
+    closePresenceConnection(created.room.id, creator.userId);
+    expect(getRoom(created.room.id)?.participants[0].status).toBe("offline");
   });
 
   it("keeps seed content in the Demo room only", () => {
