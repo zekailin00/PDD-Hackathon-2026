@@ -29,7 +29,7 @@ import type {
   RoomVisibility,
 } from "@/lib/domain";
 import { ROOM_AGENT_SYSTEM } from "@/lib/prompts";
-import { downloadGeneratedTypeScript } from "@/pdd/generated-code-download";
+import { downloadGeneratedJavaScript } from "@/pdd/generated-code-download";
 import type { Difficulty } from "@/pdd/model-router";
 import type { Role } from "@/pdd/role-policy";
 
@@ -128,7 +128,7 @@ const COPY = {
     testsEmpty: "No test artifact yet.",
     criteriaEmpty: "No acceptance artifact yet.",
     approvalGate: "Room approval gate",
-    approvalHelp: "Download the latest generated code as a self-contained TypeScript module.",
+    approvalHelp: "Download the latest generated code as a self-contained JavaScript module.",
     approve: "Approve",
     requestChanges: "Request changes",
     exportIssue: "Download generated code",
@@ -236,7 +236,7 @@ const COPY = {
     testsEmpty: "尚無測試產物。",
     criteriaEmpty: "尚無驗收產物。",
     approvalGate: "房間核准關卡",
-    approvalHelp: "將最新生成程式碼下載成自包含的 TypeScript 模組。",
+    approvalHelp: "將最新生成程式碼下載成自包含的 JavaScript 模組。",
     approve: "核准",
     requestChanges: "要求修改",
     exportIssue: "下載生成程式碼",
@@ -561,8 +561,8 @@ export default function Home() {
     if (!html) return setNotice("Run the agent to generate code before downloading it.");
     try {
       const stem = room.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "coprompt-generated";
-      downloadGeneratedTypeScript(html.content, `${stem}.ts`);
-      setNotice("Generated TypeScript download started.");
+      downloadGeneratedJavaScript(html.content, `${stem}.js`);
+      setNotice("Generated JavaScript download started.");
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not download generated code."); }
   };
   const logout = async () => {
