@@ -95,6 +95,9 @@ const COPY = {
     joinFailed: "Could not join the room.",
     copyInvite: "Copy invite",
     roomSettings: "Room settings",
+    roomId: "Room ID",
+    copyRoomId: "Copy room ID",
+    roomIdCopied: "Room ID copied.",
     deleteRoom: "Delete room",
     deleteRoomConfirm: "Delete this room for everyone? This cannot be undone.",
     roomDeleted: "This room was deleted.",
@@ -227,6 +230,9 @@ const COPY = {
     joinFailed: "加入房間失敗。",
     copyInvite: "複製邀請",
     roomSettings: "房間設定",
+    roomId: "房間 ID",
+    copyRoomId: "複製房間 ID",
+    roomIdCopied: "房間 ID 已複製。",
     deleteRoom: "刪除房間",
     deleteRoomConfirm: "確定要為所有成員刪除此房間？此操作無法復原。",
     roomDeleted: "此房間已被刪除。",
@@ -720,9 +726,7 @@ export default function Home() {
         <Flex className="topbar-actions" justify="end" align="center">
           <PreferenceControls {...{ locale, setLocale, themeMode, setThemeMode }} compact />
           <Button size="1" variant="soft" onClick={() => void navigator.clipboard.writeText(inviteUrl)}>{copy.copyInvite}</Button>
-          <Button size="1" variant="soft" onClick={() => void navigator.clipboard.writeText(room.id)}>Room {room.id}</Button>
           {room.createdBy === identity.userId && !room.isDemo && <Button size="1" variant="outline" onClick={() => setSettingsOpen(true)}>{copy.roomSettings}</Button>}
-          {room.createdBy === identity.userId && !room.isDemo && <Button size="1" color="red" variant="soft" onClick={() => void deleteCurrentRoom()}>{copy.deleteRoom}</Button>}
           <Button size="1" color="red" variant="ghost" onClick={() => void logout()}>{copy.logout}</Button>
         </Flex>
       </header>
@@ -838,6 +842,7 @@ export default function Home() {
           setRoom(updated);
           if (invite) setCreatorInviteCode(invite);
         }}
+        onDelete={deleteCurrentRoom}
         setNotice={setNotice}
         copy={copy}
       />
@@ -1320,6 +1325,7 @@ function RoomSettingsDialog(props: {
   room: Room;
   token: string;
   onUpdated: (room: Room, inviteCode?: string) => void;
+  onDelete: () => void;
   setNotice: (value: string) => void;
   copy: Copy;
 }) {
@@ -1374,6 +1380,22 @@ function RoomSettingsDialog(props: {
       <Dialog.Title>{props.copy.roomSettings}</Dialog.Title>
       <Dialog.Description size="2">{props.copy.settingsDescription}</Dialog.Description>
       <Flex direction="column" gap="3" mt="4">
+        <Flex className="settings-room-id" justify="between" align="center" gap="3">
+          <Box>
+            <Text as="div" size="1" color="gray" weight="bold">{props.copy.roomId}</Text>
+            <Text as="div" size="2">{props.room.id}</Text>
+          </Box>
+          <Button
+            size="1"
+            variant="soft"
+            onClick={() => {
+              void navigator.clipboard.writeText(props.room.id);
+              props.setNotice(props.copy.roomIdCopied);
+            }}
+          >
+            {props.copy.copyRoomId}
+          </Button>
+        </Flex>
         <TextField.Root value={title} onChange={(event) => setTitle(event.target.value)} />
         <Select.Root value={visibility} onValueChange={(value) => setVisibility(value as RoomVisibility)}>
           <Select.Trigger />
@@ -1443,7 +1465,13 @@ function RoomSettingsDialog(props: {
           </Box>
         </Box>
       </Flex>
-      <Flex justify="end" gap="2" mt="5"><Dialog.Close><Button variant="soft" color="gray">{props.copy.cancel}</Button></Dialog.Close><Button onClick={save}>{props.copy.saveSettings}</Button></Flex>
+      <Flex justify="between" gap="2" mt="5">
+        <Button color="red" variant="soft" onClick={props.onDelete}>{props.copy.deleteRoom}</Button>
+        <Flex gap="2">
+          <Dialog.Close><Button variant="soft" color="gray">{props.copy.cancel}</Button></Dialog.Close>
+          <Button onClick={save}>{props.copy.saveSettings}</Button>
+        </Flex>
+      </Flex>
     </Dialog.Content>
   </Dialog.Root>;
 }
