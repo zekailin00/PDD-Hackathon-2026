@@ -405,6 +405,21 @@ export function removeParticipant(roomId: string, userId: string): void {
   publishSnapshot(room);
 }
 
+export function deleteRoom(roomId: string, userId: string): void {
+  const room = requiredRoom(roomId);
+  if (room.createdBy !== userId) throw new Error("Only the room creator can delete this room.");
+  if (room.isDemo) throw new Error("The Demo room cannot be deleted.");
+  const id = room.id;
+  publish(id, { type: "deleted", roomId: id });
+  store.rooms.delete(id);
+  store.secrets.delete(id);
+  store.sourceContexts.delete(id);
+  for (const key of [...store.presenceConnections.keys()]) {
+    if (key.startsWith(`${id}:`)) store.presenceConnections.delete(key);
+  }
+  store.listeners.delete(id);
+}
+
 export function addMessage(roomId: string, message: Omit<RoomMessage, "id" | "createdAt">): RoomMessage {
   const room = requiredRoom(roomId);
   const created = { ...message, id: randomUUID(), createdAt: now() };

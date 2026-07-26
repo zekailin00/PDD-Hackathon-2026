@@ -95,6 +95,9 @@ const COPY = {
     joinFailed: "Could not join the room.",
     copyInvite: "Copy invite",
     roomSettings: "Room settings",
+    deleteRoom: "Delete room",
+    deleteRoomConfirm: "Delete this room for everyone? This cannot be undone.",
+    roomDeleted: "This room was deleted.",
     logout: "Logout",
     leaveConfirm: "Leave this room? Your membership will be removed.",
     roomMembers: "Room members",
@@ -224,6 +227,9 @@ const COPY = {
     joinFailed: "加入房間失敗。",
     copyInvite: "複製邀請",
     roomSettings: "房間設定",
+    deleteRoom: "刪除房間",
+    deleteRoomConfirm: "確定要為所有成員刪除此房間？此操作無法復原。",
+    roomDeleted: "此房間已被刪除。",
     logout: "登出",
     leaveConfirm: "確定要離開房間？你的成員身分會從房間移除。",
     roomMembers: "房間成員",
@@ -390,6 +396,20 @@ export default function Home() {
     setPublicRooms(data.rooms ?? []);
   };
 
+  const exitRoom = async (message?: string) => {
+    setRoom(null);
+    setToken("");
+    setCreatorInviteCode("");
+    setUrlInviteCode("");
+    setIntentDraft("");
+    setLiveOutput("");
+    setProgress(null);
+    lastRoomId.current = "";
+    if (message) setNotice(message);
+    window.history.replaceState({}, "", window.location.pathname);
+    await refreshRooms();
+  };
+
   useEffect(() => {
     const storedPreferences = localStorage.getItem(preferencesKey);
     if (storedPreferences) {
@@ -449,6 +469,8 @@ export default function Home() {
       } else if (value.type === "done") {
         setProgress(null);
         setLiveOutput("");
+      } else if (value.type === "deleted") {
+        void exitRoom(copy.roomDeleted);
       } else if (value.type === "error") {
         setProgress(null);
         setNotice(value.message);
@@ -458,7 +480,7 @@ export default function Home() {
       events.close();
       lastRoomId.current = "";
     };
-  }, [copy.haltedBy, copy.steerApplied, copy.step, room?.id, token]);
+  }, [copy.haltedBy, copy.roomDeleted, copy.steerApplied, copy.step, room?.id, token]);
 
   useEffect(() => {
     if (!room || !token) return;
@@ -648,12 +670,19 @@ export default function Home() {
       const data = await response.json();
       return setNotice(data.error);
     }
-    setRoom(null);
-    setToken("");
-    setCreatorInviteCode("");
-    setLiveOutput("");
-    window.history.replaceState({}, "", window.location.pathname);
-    await refreshRooms();
+    await exitRoom();
+  };
+
+  const deleteCurrentRoom = async () => {
+    if (!room || !window.confirm(copy.deleteRoomConfirm)) return;
+    const response = await fetch(`/api/rooms/${room.id}`, authorized(token, {
+      operation: "delete_room",
+    }, "DELETE"));
+    if (!response.ok) {
+      const data = await response.json();
+      return setNotice(data.error);
+    }
+    await exitRoom(copy.roomDeleted);
   };
 
   const inviteUrl = (() => {
@@ -689,18 +718,11 @@ export default function Home() {
           <Text size="2">{room.title}</Text>
         </Flex>
         <Flex className="topbar-actions" justify="end" align="center">
-          <Badge className="member-count-badge" color="gray">
-            <UsersIcon />
-            {room.participants.length}
-          </Badge>
-          {sortedParticipants(room.participants).slice(0, 5).map((person) => <Box key={person.userId} className="presence-avatar">
-            <MemberAvatar person={person} showTitle />
-            <span className="presence-dot" style={{ background: presenceColor[person.status] }} />
-          </Box>)}
           <PreferenceControls {...{ locale, setLocale, themeMode, setThemeMode }} compact />
           <Button size="1" variant="soft" onClick={() => void navigator.clipboard.writeText(inviteUrl)}>{copy.copyInvite}</Button>
           <Button size="1" variant="soft" onClick={() => void navigator.clipboard.writeText(room.id)}>Room {room.id}</Button>
           {room.createdBy === identity.userId && !room.isDemo && <Button size="1" variant="outline" onClick={() => setSettingsOpen(true)}>{copy.roomSettings}</Button>}
+          {room.createdBy === identity.userId && !room.isDemo && <Button size="1" color="red" variant="soft" onClick={() => void deleteCurrentRoom()}>{copy.deleteRoom}</Button>}
           <Button size="1" color="red" variant="ghost" onClick={() => void logout()}>{copy.logout}</Button>
         </Flex>
       </header>
@@ -970,11 +992,12 @@ function ConversationPanel(props: {
     {!messages.length && !liveText && <Empty text={props.copy.conversationEmpty} />}
     {messages.map((message) => {
       const fromAgent = message.role === "agent";
+      const fromSelf = message.userId === props.meId;
       const content = fromAgent ? humanizeAgentOutput(message.content) : message.content;
       if (!content) return null;
       return <Box
         key={message.id}
-        className={`conversation-message ${fromAgent ? "from-agent" : "from-human"}`}
+        className={`conversation-message ${fromAgent ? "from-agent member-tone-agent" : fromSelf ? "from-self" : `from-other ${memberTone(message.userId)}`}`}
       >
         <Flex className="conversation-meta" align="center" gap="2">
           <Text size="1" weight="bold">
@@ -989,7 +1012,7 @@ function ConversationPanel(props: {
         </Text>
       </Box>;
     })}
-    {liveText && <Box className="conversation-message from-agent is-streaming">
+    {liveText && <Box className="conversation-message from-agent member-tone-agent is-streaming">
       <Flex className="conversation-meta" align="center" gap="2">
         <Text size="1" weight="bold">CoPrompt agent</Text>
         <Badge color="cyan">LIVE</Badge>

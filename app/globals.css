@@ -416,16 +416,30 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
-.conversation-message.from-human {
+.conversation-message.from-self {
   margin-left: auto;
   border-bottom-right-radius: 2px;
   background: var(--steer);
 }
 
+.conversation-message.from-other,
 .conversation-message.from-agent {
   margin-right: auto;
-  border-left: 6px solid var(--teal);
+  border-left: 6px solid var(--member-color);
   border-bottom-left-radius: 2px;
+  background: color-mix(in srgb, var(--member-color) 8%, var(--paper));
+}
+
+.conversation-message.from-other.member-tone-0 { --member-color: var(--teal); }
+.conversation-message.from-other.member-tone-1 { --member-color: var(--orange); }
+.conversation-message.from-other.member-tone-2 { --member-color: var(--avocado); }
+.conversation-message.from-other.member-tone-3 { --member-color: var(--cherry); }
+.conversation-message.from-other.member-tone-4 { --member-color: var(--mustard); }
+.conversation-message.from-other.member-tone-5 { --member-color: var(--brown); }
+
+.conversation-message.from-agent {
+  --member-color: var(--teal);
+  border-left: 6px solid var(--teal);
 }
 
 .conversation-message.is-streaming {

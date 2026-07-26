@@ -132,4 +132,5 @@ export type RoomEvent =
   | { type: "halted"; runId: string; by: string }
   | { type: "artifact"; artifact: Artifact }
   | { type: "done"; runId: string; status: RunStatus }
+  | { type: "deleted"; roomId: string }
   | { type: "error"; runId?: string; message: string };

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { verifyIdentity } from "@/lib/server/auth";
 import {
+  deleteRoom,
   getRoom,
   removeParticipant,
   setPresence,
@@ -37,6 +38,16 @@ const schema = z.discriminatedUnion("operation", [
   }),
   z.object({ operation: z.literal("presence"), status: z.enum(["online", "away", "offline"]) }),
 ]);
+
+const deleteSchema = z.object({ operation: z.literal("delete_room").optional() }).optional();
+
+async function readDeleteOperation(request: Request): Promise<z.infer<typeof deleteSchema>> {
+  const text = await request.text();
+  if (!text.trim()) return undefined;
+  const parsed = deleteSchema.safeParse(JSON.parse(text));
+  if (!parsed.success) throw new Error("The room delete request is invalid.");
+  return parsed.data;
+}
 
 export async function GET(request: Request, context: { params: Promise<{ roomId: string }> }) {
   const { roomId } = await context.params;
@@ -77,9 +88,14 @@ export async function DELETE(request: Request, context: { params: Promise<{ room
   const { roomId } = await context.params;
   try {
     const identity = verifyIdentity(request, roomId);
+    const operation = await readDeleteOperation(request);
+    if (operation?.operation === "delete_room") {
+      deleteRoom(roomId, identity.userId);
+      return Response.json({ ok: true, deleted: true });
+    }
     removeParticipant(roomId, identity.userId);
     return Response.json({ ok: true });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "Logout failed." }, { status: 400 });
+    return Response.json({ error: error instanceof Error ? error.message : "The room operation failed." }, { status: 400 });
   }
 }

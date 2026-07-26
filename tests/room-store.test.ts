@@ -8,6 +8,7 @@ import {
   joinRoom,
   listPublicRooms,
   closePresenceConnection,
+  deleteRoom,
   openPresenceConnection,
   removeParticipant,
   setPresence,
@@ -120,6 +121,34 @@ describe("production room boundaries", () => {
     expect(getRoom(created.room.id)?.participants[0].status).toBe("away");
     removeParticipant(created.room.id, creator.userId);
     expect(getRoom(created.room.id)?.participants).toHaveLength(0);
+  });
+
+  it("lets only a creator delete a non-demo room", () => {
+    const created = createRoom({
+      title: "Temporary room",
+      visibility: "public",
+      apiKey: "temporary-provider-key",
+      participant: creator,
+      sourceArchive: {
+        name: "project.zip",
+        fileCount: 1,
+        truncated: false,
+        context: "--- FILE: app.ts ---\nexport const ready = true;",
+      },
+    });
+    expect(() => deleteRoom(created.room.id, "guest")).toThrow(/Only the room creator/);
+
+    deleteRoom(created.room.id, creator.userId);
+
+    expect(getRoom(created.room.id)).toBeUndefined();
+    expect(getRoomProvider(created.room.id).apiKey).toBeUndefined();
+    expect(getRoomSourceContext(created.room.id)).toBe("");
+    expect(listPublicRooms().some((room) => room.id === created.room.id)).toBe(false);
+  });
+
+  it("does not delete the Demo room", () => {
+    expect(() => deleteRoom("demo", "demo-owner")).toThrow(/Demo room/);
+    expect(getRoom("demo")?.isDemo).toBe(true);
   });
 
   it("keeps same-name people as distinct room members", () => {
