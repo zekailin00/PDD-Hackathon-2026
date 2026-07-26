@@ -21,6 +21,7 @@ import {
 } from "@radix-ui/themes";
 import type {
   Artifact,
+  Participant,
   PublicRoom,
   Room,
   RoomEvent,
@@ -87,6 +88,11 @@ const COPY = {
     roomSettings: "Room settings",
     logout: "Logout",
     leaveConfirm: "Leave this room? Your membership will be removed.",
+    roomMembers: "Room members",
+    joined: "joined",
+    online: "Online",
+    away: "Away",
+    offline: "Offline",
     sharedIntent: "Shared intent document",
     sync: "Sync",
     intentSynced: "Shared intent synced",
@@ -190,6 +196,11 @@ const COPY = {
     roomSettings: "房間設定",
     logout: "登出",
     leaveConfirm: "確定要離開房間？你的成員身分會從房間移除。",
+    roomMembers: "房間成員",
+    joined: "已加入",
+    online: "在線",
+    away: "離開",
+    offline: "離線",
     sharedIntent: "共同意圖文件",
     sync: "同步",
     intentSynced: "共同意圖已同步",
@@ -257,6 +268,13 @@ const roleColor: Record<Role, "indigo" | "orange" | "pink" | "green" | "gray"> =
   pm: "indigo", eng: "orange", design: "pink", qa: "green", observer: "gray",
 };
 const presenceColor = { online: "#59cf96", away: "#f2b84b", offline: "#6d707c" };
+const presenceOrder = { online: 0, away: 1, offline: 2 };
+
+function sortedParticipants(participants: Participant[]): Participant[] {
+  return [...participants].sort(
+    (a, b) => presenceOrder[a.status] - presenceOrder[b.status] || a.name.localeCompare(b.name),
+  );
+}
 
 type Identity = { userId: string; name: string; role: Role };
 type RoomResponse = { room: Room; token: string; inviteCode?: string; identity?: Identity; error?: string };
@@ -591,7 +609,8 @@ export default function Home() {
           <Text size="2">{room.title}</Text>
         </Flex>
         <Flex className="topbar-actions" justify="end" align="center">
-          {room.participants.slice(0, 5).map((person) => <Box key={person.userId} className="presence-avatar">
+          <Badge className="member-count-badge" color="gray">👥 {room.participants.length}</Badge>
+          {sortedParticipants(room.participants).slice(0, 5).map((person) => <Box key={person.userId} className="presence-avatar">
             <Avatar fallback={person.name.slice(0, 2).toUpperCase()} color={roleColor[person.role]} size="2" title={`${person.name} · ${person.role} · ${person.status}`} />
             <span style={{ background: presenceColor[person.status] }} />
           </Box>)}
@@ -613,6 +632,8 @@ export default function Home() {
             intentDirty.current = true;
             setIntentDraft(event.target.value);
           }} disabled={room.state === "RUNNING"} />
+          <Separator size="4" />
+          <ParticipantRoster participants={room.participants} meId={identity.userId} copy={copy} />
           <Separator size="4" />
           <Flex justify="between" align="center">
             <Text size="1" color="gray" weight="bold">MEMBER CHAT</Text>
@@ -829,6 +850,32 @@ function ArtifactPanel({ room, onVote, onExport, copy }: { room: Room; onVote: (
 
 function Empty({ text }: { text: string }) {
   return <Box className="empty"><Text size="2" color="gray">{text}</Text></Box>;
+}
+
+function ParticipantRoster(props: { participants: Participant[]; meId: string; copy: Copy }) {
+  const statusLabel = {
+    online: props.copy.online,
+    away: props.copy.away,
+    offline: props.copy.offline,
+  };
+  return <Box className="participant-roster">
+    <Flex justify="between" align="center">
+      <Text size="1" color="gray" weight="bold">{props.copy.roomMembers}</Text>
+      <Badge color="gray">{props.participants.length} {props.copy.joined}</Badge>
+    </Flex>
+    <Flex className="participant-list" wrap="wrap" gap="2">
+      {sortedParticipants(props.participants).map((person) => <Box key={person.userId} className={`participant-chip is-${person.status}`}>
+        <Box className="presence-avatar">
+          <Avatar fallback={person.name.slice(0, 2).toUpperCase()} color={roleColor[person.role]} size="2" />
+          <span style={{ background: presenceColor[person.status] }} />
+        </Box>
+        <Box className="participant-copy">
+          <Text size="1" weight="bold">{person.name}{person.userId === props.meId ? ` (${props.copy.you})` : ""}</Text>
+          <Text size="1">{person.role.toUpperCase()} · {statusLabel[person.status]}</Text>
+        </Box>
+      </Box>)}
+    </Flex>
+  </Box>;
 }
 
 function Welcome(props: {

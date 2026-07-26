@@ -23,6 +23,7 @@ type Store = {
   listeners: Map<string, Set<Listener>>;
   secrets: Map<string, RoomSecret>;
   sourceContexts: Map<string, string>;
+  presenceConnections: Map<string, number>;
 };
 
 const globalStore = globalThis as typeof globalThis & { __copromptStore?: Store };
@@ -31,13 +32,14 @@ const store: Store = globalStore.__copromptStore ?? {
   listeners: new Map<string, Set<Listener>>(),
   secrets: new Map<string, RoomSecret>(),
   sourceContexts: new Map<string, string>(),
+  presenceConnections: new Map<string, number>(),
 };
 globalStore.__copromptStore = store;
 store.sourceContexts ??= new Map<string, string>();
+store.presenceConnections ??= new Map<string, number>();
 
 const now = () => new Date().toISOString();
 const inviteCode = () => randomBytes(18).toString("base64url");
-const sameName = (a: string, b: string) => a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase();
 
 function cleanRoomId(value: string): string {
   const id = value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 48);
@@ -301,10 +303,7 @@ export function joinRoom(input: {
   if (room.visibility === "private" && input.inviteCode !== secret?.inviteCode) {
     throw new Error("This private room requires a valid invite link.");
   }
-  // Names are the stable room-level identity: refreshing or rejoining with
-  // the same name restores the existing participant and its role.
-  const existing = room.participants.find((item) => sameName(item.name, input.participant.name));
-  const joined = existing ? { ...existing, status: "online" as const, lastSeenAt: now() } : participant(input.participant);
+  const joined = participant(input.participant);
   room.participants = [...room.participants.filter((item) => item.userId !== joined.userId), joined];
   room.updatedAt = joined.lastSeenAt;
   publish(room.id, { type: "presence", participants: room.participants });
@@ -370,8 +369,30 @@ export function setPresence(roomId: string, userId: string, status: Presence): v
   publishSnapshot(room);
 }
 
+function presenceKey(roomId: string, userId: string): string {
+  return `${cleanRoomId(roomId)}:${userId}`;
+}
+
+export function openPresenceConnection(roomId: string, userId: string): void {
+  const key = presenceKey(roomId, userId);
+  store.presenceConnections.set(key, (store.presenceConnections.get(key) ?? 0) + 1);
+  setPresence(roomId, userId, "online");
+}
+
+export function closePresenceConnection(roomId: string, userId: string): void {
+  const key = presenceKey(roomId, userId);
+  const remaining = Math.max(0, (store.presenceConnections.get(key) ?? 1) - 1);
+  if (remaining) {
+    store.presenceConnections.set(key, remaining);
+    return;
+  }
+  store.presenceConnections.delete(key);
+  setPresence(roomId, userId, "offline");
+}
+
 export function removeParticipant(roomId: string, userId: string): void {
   const room = requiredRoom(roomId);
+  store.presenceConnections.delete(presenceKey(roomId, userId));
   room.participants = room.participants.filter((item) => item.userId !== userId);
   room.updatedAt = now();
   publish(room.id, { type: "presence", participants: room.participants });

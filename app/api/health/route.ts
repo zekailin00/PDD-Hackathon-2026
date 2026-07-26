@@ -1,4 +1,5 @@
 import { listPublicRooms } from "@/lib/server/rooms";
+import { isTokenRouterConfigured } from "@/lib/server/tokenrouter";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export async function GET() {
     ok: true,
     runtime: "node",
     rooms: listPublicRooms().length,
-    tokenRouterConfigured: Boolean(process.env.TOKENROUTER_API_KEY),
+    tokenRouterConfigured: isTokenRouterConfigured(),
     mem0Configured: Boolean(process.env.MEM0_API_KEY),
     githubConfigured: Boolean(
       process.env.GITHUB_TOKEN

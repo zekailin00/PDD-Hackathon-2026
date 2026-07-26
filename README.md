@@ -14,7 +14,8 @@ Live production: [https://coprompt-ai.onrender.com](https://coprompt-ai.onrender
 - Optional starting project ZIP, loaded as server-side read-only agent context.
 - Server-only TokenRouter keys and live-catalog model selection; Opus is excluded.
 - Shared intent plus Member Chat that is never sent to AI and uses zero tokens.
-- Online/away/offline presence, confirmed logout, and reply threads.
+- A visible member roster with per-user avatars and online/away/offline presence,
+  including distinct identities for people who use the same display name.
 - Three-phase streamed execution with NUDGE/HALT checkpoint steering.
 - Complete HTML preview/code, acceptance criteria, tests, and room quorum.
 - Approved PDD Issue export to GitHub.
@@ -38,6 +39,9 @@ Required for live AI runs:
 ```dotenv
 TOKENROUTER_API_KEY=
 ```
+
+`TOKENROUTER_API_KEY` is the preferred Render variable name. For compatibility,
+the server also accepts `TOKEN_ROUTER_API_KEY` or `TOKENROUTER_KEY`.
 
 Optional integrations:
 
