@@ -14,9 +14,9 @@ export async function POST(request: Request, context: { params: Promise<{ roomId
       replyTo: z.string().uuid().optional(),
       kind: z.enum(["member", "answer"]).default("member"),
     }).safeParse(await request.json());
-    if (!parsed.success) return Response.json({ error: "訊息格式錯誤。" }, { status: 400 });
+    if (!parsed.success) return Response.json({ error: "The message is invalid." }, { status: 400 });
     if (parsed.data.replyTo && !getRoom(roomId)?.messages.some((item) => item.id === parsed.data.replyTo)) {
-      return Response.json({ error: "回覆的訊息不存在。" }, { status: 404 });
+      return Response.json({ error: "The message being replied to does not exist." }, { status: 404 });
     }
     const message = addMessage(roomId, {
       authorName: identity.name, userId: identity.userId, role: identity.role, ...parsed.data,
@@ -29,11 +29,11 @@ export async function POST(request: Request, context: { params: Promise<{ roomId
     if (run && parsed.data.kind !== "member") {
       reportProgress({
         roomId, runId: run.id, phase: "building", step: run.step,
-        label: `${identity.name} 的訊息已送出，等待 agent 於下個檢查點讀取`,
+        label: `${identity.name}'s message was sent and is waiting for the agent's next checkpoint`,
       });
     }
     return Response.json({ message }, { status: 201 });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "訊息送出失敗。" }, { status: 400 });
+    return Response.json({ error: error instanceof Error ? error.message : "The message could not be sent." }, { status: 400 });
   }
 }

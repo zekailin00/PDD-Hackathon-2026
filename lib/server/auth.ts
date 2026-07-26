@@ -28,12 +28,12 @@ export function verifyIdentity(request: Request, roomId: string): Identity {
 
 export function verifyIdentityToken(token: string, roomId: string): Identity {
   const [payload, provided] = token.split(".");
-  if (!payload || !provided) throw new Error("缺少有效的房間身分。");
+  if (!payload || !provided) throw new Error("A valid room identity is required.");
   const expected = signature(payload);
   const a = Buffer.from(provided);
   const b = Buffer.from(expected);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) throw new Error("房間身分無效。");
+  if (a.length !== b.length || !timingSafeEqual(a, b)) throw new Error("The room identity is invalid.");
   const identity = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as Identity;
-  if (identity.roomId !== roomId) throw new Error("房間身分不符。");
+  if (identity.roomId !== roomId) throw new Error("The room identity does not match this room.");
   return identity;
 }

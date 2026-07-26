@@ -9,6 +9,7 @@ import {
   listPublicRooms,
   removeParticipant,
   setPresence,
+  updateRoomSettings,
 } from "@/lib/server/rooms";
 import { recentContext } from "@/lib/server/run-agent";
 
@@ -30,7 +31,7 @@ describe("production room boundaries", () => {
       roomId: created.room.id,
       inviteCode: "wrong",
       participant: { userId: "guest", name: "Guest", role: "qa" },
-    })).toThrow(/邀請連結/);
+    })).toThrow(/valid invite link/);
 
     const joined = joinRoom({
       roomId: created.room.id,
@@ -38,6 +39,23 @@ describe("production room boundaries", () => {
       participant: { userId: "guest", name: "Guest", role: "qa" },
     });
     expect(joined.participants.some((person) => person.userId === "guest")).toBe(true);
+  });
+
+  it("keeps long-term memory opt-in and creator-controlled", () => {
+    const created = createRoom({
+      title: "Memory settings",
+      visibility: "public",
+      participant: creator,
+    });
+    expect(created.room.memoryEnabled).toBe(false);
+
+    const updated = updateRoomSettings(created.room.id, creator.userId, {
+      memoryEnabled: true,
+    });
+    expect(updated.room.memoryEnabled).toBe(true);
+    expect(() => updateRoomSettings(created.room.id, "guest", {
+      memoryEnabled: false,
+    })).toThrow(/Only the room creator/);
   });
 
   it("never includes Member Chat in AI context", () => {
@@ -86,9 +104,15 @@ describe("production room boundaries", () => {
       participant: creator,
     });
     expect(demo?.isDemo).toBe(true);
-    expect(demo?.messages.some((message) => message.content.includes("唯一含有示範資料"))).toBe(true);
+    expect(demo?.messages.some((message) => message.content.includes("only room with seeded demo data"))).toBe(true);
+    expect(demo?.messages.some((message) => message.kind === "member")).toBe(true);
+    expect(demo?.runs.some((run) => run.status === "proposed" && run.output)).toBe(true);
+    expect(demo?.artifacts.map((artifact) => artifact.kind).sort()).toEqual(["criteria", "html", "tests"]);
+    expect(demo?.state).toBe("PROPOSED");
     expect(created.room.isDemo).toBeUndefined();
-    expect(created.room.messages.some((message) => message.content.includes("示範資料"))).toBe(false);
+    expect(created.room.messages.some((message) => message.content.includes("seeded demo data"))).toBe(false);
+    expect(created.room.runs).toHaveLength(0);
+    expect(created.room.artifacts).toHaveLength(0);
   });
 
   it("keeps imported ZIP content server-side while exposing safe metadata", () => {

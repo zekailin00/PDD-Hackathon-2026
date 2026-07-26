@@ -18,6 +18,7 @@ const schema = z.discriminatedUnion("action", [
     title: z.string().trim().min(1).max(100),
     visibility: z.enum(["public", "private"]),
     systemPrompt: z.string().max(20_000).optional(),
+    memoryEnabled: z.union([z.boolean(), z.enum(["true", "false"])]).optional(),
     preferredModel: z.string().max(200).optional(),
     apiKey: z.string().max(500).optional(),
     baseUrl: z.string().url().max(500).optional().or(z.literal("")),
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
   try {
     const { payload, projectZip } = await readRequest(request);
     const parsed = schema.safeParse(payload);
-    if (!parsed.success) return Response.json({ error: "房間資料格式錯誤。" }, { status: 400 });
+    if (!parsed.success) return Response.json({ error: "The room data is invalid." }, { status: 400 });
     const member = {
       userId: parsed.data.userId,
       name: parsed.data.name,
@@ -65,6 +66,7 @@ export async function POST(request: Request) {
         title: parsed.data.title,
         visibility: parsed.data.visibility,
         systemPrompt: parsed.data.systemPrompt,
+        memoryEnabled: parsed.data.memoryEnabled === true || parsed.data.memoryEnabled === "true",
         preferredModel: parsed.data.preferredModel,
         apiKey: parsed.data.apiKey,
         baseUrl: parsed.data.baseUrl,
@@ -90,7 +92,7 @@ export async function POST(request: Request) {
     return Response.json({ room: result.room, token, inviteCode: result.inviteCode, identity: resolved });
   } catch (error) {
     return Response.json(
-      { error: error instanceof Error ? error.message : "房間操作失敗。" },
+      { error: error instanceof Error ? error.message : "The room operation failed." },
       { status: 400 },
     );
   }

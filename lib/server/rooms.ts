@@ -52,29 +52,155 @@ function participant(input: { userId: string; name: string; role: Role }): Parti
 function seedDemoRoom(): void {
   if (store.rooms.has("demo")) return;
   const timestamp = now();
+  const kickoffMessageId = randomUUID();
+  const runId = randomUUID();
+  const demoOutput = [
+    "Demo proposal ready for room review.",
+    "",
+    "1. Added a focused launch checklist.",
+    "2. Included browser-ready HTML, acceptance criteria, and QA tests.",
+    "3. Waiting for the room to approve or request changes.",
+  ].join("\n");
+  const demoHtml = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CoPrompt Launch Checklist</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0b1020; color: #eef2ff; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    main { width: min(560px, calc(100% - 32px)); padding: 32px; border: 1px solid #334155; border-radius: 24px; background: #111827; box-shadow: 0 24px 80px #02061780; }
+    .eyebrow { color: #a5b4fc; font-size: 12px; font-weight: 800; letter-spacing: .16em; }
+    h1 { margin: 10px 0 8px; font-size: clamp(28px, 7vw, 44px); }
+    p { color: #aab4c8; line-height: 1.6; }
+    ul { display: grid; gap: 12px; padding: 0; list-style: none; }
+    li { padding: 14px 16px; border-radius: 14px; background: #1e293b; }
+    li::before { content: "✓"; margin-right: 10px; color: #34d399; font-weight: 900; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">COPROMPT DEMO</div>
+    <h1>Launch checklist</h1>
+    <p>A room-approved artifact generated from one shared team intent.</p>
+    <ul>
+      <li>Product goal is clear</li>
+      <li>Preview works in the browser</li>
+      <li>Acceptance criteria match the tests</li>
+    </ul>
+  </main>
+</body>
+</html>`;
   store.rooms.set("demo", {
     id: "demo",
     title: "Demo",
     createdBy: "demo-owner",
     visibility: "public",
     systemPrompt: ROOM_AGENT_SYSTEM,
+    memoryEnabled: false,
     preferredModel: "",
     isDemo: true,
-    state: "IDLE",
-    intent: "## Goal\n建立一個清楚、可共同審核的產品變更。\n\n## Acceptance criteria\n1. 產物可預覽\n2. 測試與驗收條件一致\n\n## Must not\n- 不得洩漏任何 API key\n",
+    state: "PROPOSED",
+    intent: "## Goal\nCreate a clear launch checklist the whole room can review.\n\n## Acceptance criteria\n1. The artifact renders directly in the browser preview.\n2. The page contains three launch checklist items.\n3. Tests match the acceptance criteria.\n\n## Must not\n- Do not call external APIs.\n- Do not expose API keys or other secrets.\n",
     participants: [],
-    messages: [{
-      id: randomUUID(),
-      authorName: "CoPrompt",
-      userId: "agent",
-      role: "agent",
-      kind: "system",
-      content: "這是唯一含有示範資料的 Demo 房間。加入後可直接體驗共同意圖、Member Chat、Steering Queue 與核准流程。",
+    messages: [
+      {
+        id: randomUUID(),
+        authorName: "CoPrompt",
+        userId: "agent",
+        role: "agent",
+        kind: "system",
+        content: "This is the only room with seeded demo data. Explore the shared intent, Member Chat, agent proposal, artifact preview, and approval flow.",
+        createdAt: timestamp,
+      },
+      {
+        id: kickoffMessageId,
+        authorName: "Mia",
+        userId: "demo-pm",
+        role: "pm",
+        kind: "member",
+        content: "I added the launch checklist goal and acceptance criteria to the shared intent. Please confirm the scope.",
+        createdAt: timestamp,
+      },
+      {
+        id: randomUUID(),
+        authorName: "Leo",
+        userId: "demo-eng",
+        role: "eng",
+        kind: "member",
+        content: "The scope is clear. Keep the HTML self-contained and avoid external APIs so it can run directly in the preview iframe.",
+        replyTo: kickoffMessageId,
+        createdAt: timestamp,
+      },
+      {
+        id: randomUUID(),
+        authorName: "Mia",
+        userId: "demo-pm",
+        role: "pm",
+        kind: "prompt",
+        content: "Build the launch checklist preview from the shared intent and include acceptance criteria and tests.",
+        runId,
+        seenByAgent: true,
+        createdAt: timestamp,
+      },
+      {
+        id: randomUUID(),
+        authorName: "CoPrompt agent",
+        userId: "agent",
+        role: "agent",
+        kind: "agent",
+        content: demoOutput,
+        runId,
+        createdAt: timestamp,
+      },
+    ],
+    runs: [{
+      id: runId,
+      status: "proposed",
+      startedBy: "demo-pm",
+      model: "Demo model",
+      difficulty: "standard",
+      output: demoOutput,
+      tokenAllocation: { "demo-pm": 96, "demo-eng": 72 },
+      step: 3,
       createdAt: timestamp,
     }],
-    runs: [],
     steers: [],
-    artifacts: [],
+    artifacts: [
+      {
+        id: randomUUID(),
+        version: 1,
+        kind: "html",
+        content: demoHtml,
+        runId,
+        createdAt: timestamp,
+      },
+      {
+        id: randomUUID(),
+        version: 1,
+        kind: "tests",
+        content: [
+          "1. Open the Preview tab and confirm the page renders without network requests.",
+          "2. Confirm exactly three checklist items are visible.",
+          "3. Resize to 320px wide and confirm no horizontal scrolling.",
+        ].join("\n"),
+        runId,
+        createdAt: timestamp,
+      },
+      {
+        id: randomUUID(),
+        version: 1,
+        kind: "criteria",
+        content: [
+          "- Browser-ready single-file HTML is present.",
+          "- Three launch checklist items are readable.",
+          "- The preview is responsive and uses no external API.",
+        ].join("\n"),
+        runId,
+        createdAt: timestamp,
+      },
+    ],
     votes: [],
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -104,6 +230,7 @@ export function createRoom(input: {
   title?: string;
   visibility: RoomVisibility;
   systemPrompt?: string;
+  memoryEnabled?: boolean;
   preferredModel?: string;
   apiKey?: string;
   baseUrl?: string;
@@ -124,6 +251,7 @@ export function createRoom(input: {
     createdBy: input.participant.userId,
     visibility: input.visibility,
     systemPrompt: input.systemPrompt?.trim().slice(0, 20_000) || ROOM_AGENT_SYSTEM,
+    memoryEnabled: input.memoryEnabled ?? false,
     preferredModel: input.preferredModel?.trim().slice(0, 200) || "",
     sourceArchive: input.sourceArchive ? {
       name: input.sourceArchive.name,
@@ -140,8 +268,8 @@ export function createRoom(input: {
       role: "agent",
       kind: "system",
       content: input.sourceArchive
-        ? `房間已準備好，已載入 ${input.sourceArchive.name} 的 ${input.sourceArchive.fileCount} 個文字檔${input.sourceArchive.truncated ? "（已依安全限制截斷）" : ""}。共同編寫意圖，然後啟動 agent。`
-        : "房間已準備好。共同編寫意圖，然後啟動 agent。",
+        ? `The room is ready. Loaded ${input.sourceArchive.fileCount} text file(s) from ${input.sourceArchive.name}${input.sourceArchive.truncated ? " (truncated to the safety limit)" : ""}. Co-author the shared intent, then start the agent.`
+        : "The room is ready. Co-author the shared intent, then start the agent.",
       createdAt: timestamp,
     }],
     runs: [],
@@ -171,7 +299,7 @@ export function joinRoom(input: {
   if (!room) throw new Error("Room not found.");
   const secret = store.secrets.get(room.id);
   if (room.visibility === "private" && input.inviteCode !== secret?.inviteCode) {
-    throw new Error("這個私人房間需要有效邀請連結。");
+    throw new Error("This private room requires a valid invite link.");
   }
   // Names are the stable room-level identity: refreshing or rejoining with
   // the same name restores the existing participant and its role.
@@ -191,17 +319,19 @@ export function updateRoomSettings(
     title?: string;
     visibility?: RoomVisibility;
     systemPrompt?: string;
+    memoryEnabled?: boolean;
     preferredModel?: string;
     apiKey?: string;
     baseUrl?: string;
   },
 ): { room: Room; inviteCode: string } {
   const room = requiredRoom(roomId);
-  if (room.createdBy !== userId) throw new Error("只有建立者可以修改房間設定。");
-  if (room.isDemo) throw new Error("Demo 房間設定不可修改。");
+  if (room.createdBy !== userId) throw new Error("Only the room creator can change room settings.");
+  if (room.isDemo) throw new Error("Demo room settings cannot be changed.");
   if (patch.title !== undefined) room.title = patch.title.trim().slice(0, 100) || room.title;
   if (patch.visibility !== undefined) room.visibility = patch.visibility;
   if (patch.systemPrompt !== undefined) room.systemPrompt = patch.systemPrompt.trim().slice(0, 20_000) || ROOM_AGENT_SYSTEM;
+  if (patch.memoryEnabled !== undefined) room.memoryEnabled = patch.memoryEnabled;
   if (patch.preferredModel !== undefined) room.preferredModel = patch.preferredModel.trim().slice(0, 200);
   const secret = store.secrets.get(room.id) ?? { inviteCode: inviteCode() };
   if (patch.apiKey !== undefined) secret.apiKey = patch.apiKey.trim() || undefined;
@@ -223,7 +353,7 @@ export function getRoomSourceContext(roomId: string): string {
 
 export function updateIntent(roomId: string, intent: string): Room {
   const room = requiredRoom(roomId);
-  if (room.state === "RUNNING") throw new Error("執行中不能直接改意圖；請改用 NUDGE。");
+  if (room.state === "RUNNING") throw new Error("The shared intent cannot be edited during a run. Use NUDGE instead.");
   room.intent = intent.slice(0, 50_000);
   room.updatedAt = now();
   publishSnapshot(room);
@@ -240,11 +370,8 @@ export function setPresence(roomId: string, userId: string, status: Presence): v
   publishSnapshot(room);
 }
 
-export function removeParticipant(roomId: string, userId: string, presenceStamp?: string): void {
+export function removeParticipant(roomId: string, userId: string): void {
   const room = requiredRoom(roomId);
-  const participant = room.participants.find((item) => item.userId === userId);
-  // Ignore a delayed close beacon from a tab that was refreshed or rejoined.
-  if (presenceStamp && participant?.lastSeenAt !== presenceStamp) return;
   room.participants = room.participants.filter((item) => item.userId !== userId);
   room.updatedAt = now();
   publish(room.id, { type: "presence", participants: room.participants });
@@ -274,7 +401,7 @@ export function markMessagesSeen(roomId: string): void {
 export function startRun(roomId: string, startedBy: string, difficulty: Difficulty): RoomRun {
   const room = requiredRoom(roomId);
   if (room.state === "RUNNING" || room.state === "AWAITING_INPUT") {
-    throw new Error("另一位隊友已經啟動 agent。");
+    throw new Error("Another teammate has already started the agent.");
   }
   const run: RoomRun = {
     id: randomUUID(), status: "running", startedBy, difficulty, output: "", step: 0, createdAt: now(),

@@ -52,6 +52,7 @@ export type Artifact = {
 export type RoomRun = {
   id: string;
   status: RunStatus;
+  memoryStatus?: "pending" | "queued" | "error";
   startedBy: string;
   model?: string;
   difficulty: Difficulty;
@@ -74,6 +75,7 @@ export type Room = {
   createdBy: string;
   visibility: RoomVisibility;
   systemPrompt: string;
+  memoryEnabled: boolean;
   preferredModel?: string;
   sourceArchive?: {
     name: string;

@@ -15,7 +15,7 @@ const schema = z.object({
 export async function POST(request: Request) {
   const payload = await request.json();
   const parsed = schema.safeParse(payload);
-  if (!parsed.success) return Response.json({ error: "Agent 請求格式錯誤。" }, { status: 400 });
+  if (!parsed.success) return Response.json({ error: "The agent request is invalid." }, { status: 400 });
   try {
     const identity = verifyIdentity(request, parsed.data.roomId);
     const encoder = new TextEncoder();
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
           await executeRoomAgent({ ...parsed.data, identity });
           controller.enqueue(encoder.encode("data: {\"ok\":true}\n\n"));
         } catch (error) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: error instanceof Error ? error.message : "執行失敗。" })}\n\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: error instanceof Error ? error.message : "The run failed." })}\n\n`));
         } finally {
           controller.close();
         }
@@ -35,6 +35,6 @@ export async function POST(request: Request) {
       headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform" },
     });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "未授權。" }, { status: 401 });
+    return Response.json({ error: error instanceof Error ? error.message : "Unauthorized." }, { status: 401 });
   }
 }

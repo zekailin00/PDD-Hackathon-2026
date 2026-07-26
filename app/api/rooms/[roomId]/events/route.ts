@@ -12,7 +12,7 @@ export async function GET(request: Request, context: { params: Promise<{ roomId:
     identity = verifyIdentity(request, roomId);
     setPresence(roomId, identity.userId, "online");
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "未授權。" }, { status: 401 });
+    return Response.json({ error: error instanceof Error ? error.message : "Unauthorized." }, { status: 401 });
   }
   const encoder = new TextEncoder();
   let unsubscribe = () => {};
