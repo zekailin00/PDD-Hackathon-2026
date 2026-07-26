@@ -41,7 +41,9 @@ TOKENROUTER_API_KEY=
 ```
 
 `TOKENROUTER_API_KEY` is the preferred Render variable name. For compatibility,
-the server also accepts `TOKEN_ROUTER_API_KEY` or `TOKENROUTER_KEY`.
+the server also accepts `TOKEN_ROUTER_API_KEY`, `TOKENROUTER_KEY`, or the
+existing Render `FALLBACK_API_KEY`. `OPENROUTER_API_KEY` is intentionally not
+used against the TokenRouter endpoint.
 
 Optional integrations:
 

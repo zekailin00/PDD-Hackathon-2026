@@ -8,6 +8,7 @@ export function tokenRouterApiKey(): string {
     process.env.TOKENROUTER_API_KEY
     || process.env.TOKEN_ROUTER_API_KEY
     || process.env.TOKENROUTER_KEY
+    || process.env.FALLBACK_API_KEY
     || ""
   ).trim();
 }
