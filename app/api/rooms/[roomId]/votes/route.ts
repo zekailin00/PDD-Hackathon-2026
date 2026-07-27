@@ -2,8 +2,8 @@ import { z } from "zod";
 import { verifyIdentity } from "@/lib/server/auth";
 import { addMessage, getRoom, publishSnapshot, recordVote, updateRun } from "@/lib/server/rooms";
 import { rememberApprovedDecision } from "@/lib/server/memory";
-import { evaluateQuorum } from "@/pdd/approval-quorum";
-import { can, voters } from "@/pdd/role-policy";
+import { evaluateQuorum } from "@/lib/approval";
+import { can, voters } from "@/lib/roles";
 
 export const runtime = "nodejs";
 
@@ -40,7 +40,7 @@ export async function POST(request: Request, context: { params: Promise<{ roomId
     const result = evaluateQuorum(electorate, room.votes.filter((vote) => vote.runId === parsed.data.runId));
     const run = room.runs.find((item) => item.id === parsed.data.runId);
     if (
-      result.canOpenPr
+      result.approved
       && room.memoryEnabled
       && run
       && run.memoryStatus !== "pending"

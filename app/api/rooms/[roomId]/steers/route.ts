@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { verifyIdentity } from "@/lib/server/auth";
 import { getRoom, queueSteer } from "@/lib/server/rooms";
-import { can } from "@/pdd/role-policy";
+import { can } from "@/lib/roles";
 import { reportProgress } from "@/lib/server/run-agent";
 
 export const runtime = "nodejs";

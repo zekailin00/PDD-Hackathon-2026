@@ -1,7 +1,7 @@
 export type Vote = { userId: string; verdict: "approve" | "request_changes" };
 export type QuorumPolicy = "unanimous" | "majority";
 export type QuorumResult = {
-  canOpenPr: boolean;
+  approved: boolean;
   approvedBy: string[];
   rejectedBy: string[];
   waitingOn: string[];
@@ -28,11 +28,11 @@ export function evaluateQuorum(
   const enough = policy === "unanimous"
     ? electorate.length > 0 && approvedBy.length === electorate.length
     : approvedBy.length >= threshold;
-  const canOpenPr = rejectedBy.length === 0 && enough;
+  const approved = rejectedBy.length === 0 && enough;
   const reason = rejectedBy.length > 0
     ? `Blocked by ${rejectedBy.length} request-changes vote(s).`
-    : canOpenPr
+    : approved
       ? `${policy} approval reached.`
       : `Waiting for ${waitingOn.length} eligible voter(s).`;
-  return { canOpenPr, approvedBy, rejectedBy, waitingOn, reason };
+  return { approved, approvedBy, rejectedBy, waitingOn, reason };
 }

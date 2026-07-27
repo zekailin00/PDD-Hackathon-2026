@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseModel, eligibleModels, NoEligibleModel, type CatalogModel } from "../pdd/model-router";
+import { chooseModel, eligibleModels, NoEligibleModel, type CatalogModel } from "../lib/model-router";
 
 const model = (id: string, endpoints = ["openai"], tags = "Text"): CatalogModel => ({
   id, supported_endpoint_types: endpoints, tags,

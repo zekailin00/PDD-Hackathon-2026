@@ -13,8 +13,8 @@ import type {
   VoteRecord,
 } from "@/lib/domain";
 import { ROOM_AGENT_SYSTEM } from "@/lib/prompts";
-import type { Difficulty } from "@/pdd/model-router";
-import type { Role, RoleOverrides } from "@/pdd/role-policy";
+import type { Difficulty } from "@/lib/model-router";
+import type { Role, RoleOverrides } from "@/lib/roles";
 
 type Listener = (event: RoomEvent) => void;
 type RoomSecret = { inviteCode: string; apiKey?: string; baseUrl?: string };

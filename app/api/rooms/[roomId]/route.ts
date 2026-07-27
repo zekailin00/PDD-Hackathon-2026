@@ -8,7 +8,7 @@ import {
   updateIntent,
   updateRoomSettings,
 } from "@/lib/server/rooms";
-import { can } from "@/pdd/role-policy";
+import { can } from "@/lib/roles";
 
 export const runtime = "nodejs";
 
@@ -31,7 +31,6 @@ const schema = z.discriminatedUnion("operation", [
         halt: z.boolean().optional(),
         edit_intent: z.boolean().optional(),
         vote: z.boolean().optional(),
-        open_pr: z.boolean().optional(),
         priority: z.number().int().min(0).max(100).optional(),
       }),
     ).optional(),

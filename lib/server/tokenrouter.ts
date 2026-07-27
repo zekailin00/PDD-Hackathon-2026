@@ -1,4 +1,4 @@
-import { chooseModel, type CatalogModel, type Difficulty, type ModelChoice } from "@/pdd/model-router";
+import { chooseModel, type CatalogModel, type Difficulty, type ModelChoice } from "@/lib/model-router";
 
 const DEFAULT_BASE_URL = "https://api.tokenrouter.com/v1";
 export type ProviderConfig = { apiKey?: string; baseUrl?: string };

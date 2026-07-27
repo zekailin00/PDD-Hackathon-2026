@@ -1,7 +1,7 @@
 import type { AgentPhase, Room, RoomProgress } from "@/lib/domain";
 import { HTML_BLOCK_BEGIN, HTML_BLOCK_END, HTML_OUTPUT_PROTOCOL, ROLE_LENS, ROOM_AGENT_SYSTEM } from "@/lib/prompts";
-import { can, resolveRole } from "@/pdd/role-policy";
-import { splitTokens } from "@/pdd/token-split";
+import { can, resolveRole } from "@/lib/roles";
+import { splitTokens } from "@/lib/token-allocation";
 import {
   addArtifact, addMessage, consumeSteers, finishRun, getRoom, markMessagesSeen, publish,
   startRun, updateRun, getRoomProvider, getRoomSourceContext,
@@ -9,7 +9,7 @@ import {
 import { autoRoute, streamChat, type ChatMessage } from "@/lib/server/tokenrouter";
 import { searchRoomMemories } from "@/lib/server/memory";
 import type { Identity } from "@/lib/server/auth";
-import type { Difficulty } from "@/pdd/model-router";
+import type { Difficulty } from "@/lib/model-router";
 
 const PHASES = [
   "Read the shared intent and recent conversation. State the smallest plan and its acceptance boundary.",

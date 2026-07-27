@@ -61,4 +61,4 @@ alter table public.artifacts enable row level security;
 
 -- No anonymous table policies: application writes stay server-side.
 -- Realtime Broadcast/Presence can be enabled with private-channel policies
--- once Supabase Auth replaces the hackathon room token.
+-- once Supabase Auth replaces the temporary room token.

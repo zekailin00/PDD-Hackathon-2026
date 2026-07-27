@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitTokens } from "../pdd/token-split";
+import { splitTokens } from "../lib/token-allocation";
 
 describe("splitTokens", () => {
   it("conserves every token", () => {

@@ -29,8 +29,8 @@ import type {
 } from "@/lib/domain";
 import { humanizeAgentOutput } from "@/lib/presentation";
 import { ROOM_AGENT_SYSTEM } from "@/lib/prompts";
-import { downloadGeneratedJavaScript } from "@/pdd/generated-code-download";
-import type { Difficulty } from "@/pdd/model-router";
+import { downloadGeneratedJavaScript } from "@/lib/code-download";
+import type { Difficulty } from "@/lib/model-router";
 import {
   DEFAULT_POLICY,
   POWERS,
@@ -39,7 +39,7 @@ import {
   type Power,
   type Role,
   type RoleEntry,
-} from "@/pdd/role-policy";
+} from "@/lib/roles";
 
 const identityKey = "coprompt:identity";
 const preferencesKey = "coprompt:preferences";
@@ -177,7 +177,6 @@ const COPY = {
     haltPower: "Halt",
     editIntentPower: "Edit intent",
     votePower: "Vote",
-    openPrPower: "Export",
     newApiKey: "New API key (leave blank to keep the current server key)",
     saveSettings: "Save settings",
     settingsUpdated: "Room settings updated",
@@ -312,7 +311,6 @@ const COPY = {
     haltPower: "Halt",
     editIntentPower: "編輯意圖",
     votePower: "投票",
-    openPrPower: "匯出",
     newApiKey: "新的 API key（留空保留目前 server key）",
     saveSettings: "儲存設定",
     settingsUpdated: "房間設定已更新",
@@ -972,7 +970,6 @@ function powerLabel(power: Power, copy: Copy): string {
     halt: copy.haltPower,
     edit_intent: copy.editIntentPower,
     vote: copy.votePower,
-    open_pr: copy.openPrPower,
   }[power];
 }
 

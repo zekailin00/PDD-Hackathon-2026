@@ -1,15 +1,15 @@
-export const POWERS = ["run", "steer", "halt", "edit_intent", "vote", "open_pr"] as const;
+export const POWERS = ["run", "steer", "halt", "edit_intent", "vote"] as const;
 export type Power = typeof POWERS[number];
 export type Role = "pm" | "eng" | "design" | "qa" | "observer";
 export type RoleEntry = Record<Power, boolean> & { priority: number };
 export type RoleOverrides = Partial<Record<Role, Partial<RoleEntry>>>;
 
 export const DEFAULT_POLICY: Record<Role, RoleEntry> = {
-  pm: { run: true, steer: true, halt: true, edit_intent: true, vote: true, open_pr: true, priority: 80 },
-  eng: { run: true, steer: true, halt: true, edit_intent: true, vote: true, open_pr: true, priority: 70 },
-  qa: { run: true, steer: true, halt: true, edit_intent: false, vote: true, open_pr: true, priority: 60 },
-  design: { run: true, steer: true, halt: false, edit_intent: true, vote: true, open_pr: false, priority: 50 },
-  observer: { run: false, steer: true, halt: false, edit_intent: false, vote: false, open_pr: false, priority: 10 },
+  pm: { run: true, steer: true, halt: true, edit_intent: true, vote: true, priority: 80 },
+  eng: { run: true, steer: true, halt: true, edit_intent: true, vote: true, priority: 70 },
+  qa: { run: true, steer: true, halt: true, edit_intent: false, vote: true, priority: 60 },
+  design: { run: true, steer: true, halt: false, edit_intent: true, vote: true, priority: 50 },
+  observer: { run: false, steer: true, halt: false, edit_intent: false, vote: false, priority: 10 },
 };
 
 function safeRole(role: string): Role {

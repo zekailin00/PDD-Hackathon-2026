@@ -1,5 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import type { Role } from "@/pdd/role-policy";
+import type { Role } from "@/lib/roles";
 
 export type Identity = { roomId: string; userId: string; name: string; role: Role };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { can, resolveRole, voters } from "../pdd/role-policy";
+import { can, resolveRole, voters } from "../lib/roles";
 
 describe("role policy", () => {
   it("fails unknown roles closed", () => {

@@ -1,4 +1,3 @@
-/** Generated from prompts/generated_code_download_javascript.prompt. */
 const identifier = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
 function assertSource(source: string): void {

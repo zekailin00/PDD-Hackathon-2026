@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toGeneratedJavaScriptModule } from "@/pdd/generated-code-download";
+import { toGeneratedJavaScriptModule } from "@/lib/code-download";
 
 describe("generated code JavaScript export", () => {
   it("losslessly embeds arbitrary generated code in an importable ES module", () => {

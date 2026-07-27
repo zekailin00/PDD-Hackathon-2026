@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { evaluateQuorum } from "../pdd/approval-quorum";
+import { evaluateQuorum } from "../lib/approval";
 
 describe("evaluateQuorum", () => {
   it("requires every voter under unanimous policy", () => {
     const result = evaluateQuorum(["a", "b"], [{ userId: "a", verdict: "approve" }]);
-    expect(result.canOpenPr).toBe(false);
+    expect(result.approved).toBe(false);
     expect(result.waitingOn).toEqual(["b"]);
   });
 
@@ -13,7 +13,7 @@ describe("evaluateQuorum", () => {
       { userId: "a", verdict: "approve" },
       { userId: "b", verdict: "request_changes" },
     ], "majority");
-    expect(result.canOpenPr).toBe(false);
+    expect(result.approved).toBe(false);
   });
 
   it("ignores outsiders and uses each member's last vote", () => {
@@ -22,7 +22,7 @@ describe("evaluateQuorum", () => {
       { userId: "a", verdict: "request_changes" },
       { userId: "a", verdict: "approve" },
     ]);
-    expect(result.canOpenPr).toBe(true);
+    expect(result.approved).toBe(true);
   });
 
   it("fails loudly on unknown policy data", () => {

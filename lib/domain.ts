@@ -1,5 +1,5 @@
-import type { Difficulty } from "@/pdd/model-router";
-import type { Role, RoleOverrides } from "@/pdd/role-policy";
+import type { Difficulty } from "@/lib/model-router";
+import type { Role, RoleOverrides } from "@/lib/roles";
 
 export type RoomState = "IDLE" | "RUNNING" | "AWAITING_INPUT" | "PROPOSED";
 export type RunStatus = "running" | "proposed" | "done" | "halted" | "error";
