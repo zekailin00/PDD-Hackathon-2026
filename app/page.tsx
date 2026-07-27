@@ -357,6 +357,26 @@ function submitOnEnter(event: KeyboardEvent<HTMLTextAreaElement>, submit: () => 
   submit();
 }
 
+function withPreviewScrollbars(source: string): string {
+  const style = `<style data-coprompt-preview-scrollbars>
+    html { scrollbar-color: #a8784f transparent; scrollbar-width: thin; }
+    *::-webkit-scrollbar { width: 10px; height: 10px; }
+    *::-webkit-scrollbar-track { background: rgba(168, 120, 79, .12); }
+    *::-webkit-scrollbar-thumb {
+      min-height: 44px;
+      border: 2px solid transparent;
+      border-radius: 999px;
+      background: #a8784f;
+      background-clip: padding-box;
+    }
+    *::-webkit-scrollbar-thumb:hover { background: #d94f04; background-clip: padding-box; }
+    *::-webkit-scrollbar-corner { background: transparent; }
+  </style>`;
+  return /<\/head>/i.test(source)
+    ? source.replace(/<\/head>/i, `${style}</head>`)
+    : `${style}${source}`;
+}
+
 export default function Home() {
   const [locale, setLocale] = useState<Locale>("en");
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
@@ -1051,7 +1071,7 @@ function ArtifactPanel({ room, onOpenApproval, onExport, copy }: {
               key={html.id}
               title="Generated artifact"
               sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads"
-              srcDoc={html.content}
+              srcDoc={withPreviewScrollbars(html.content)}
             />
             : <Empty text={copy.previewEmpty} />}
         </Tabs.Content>

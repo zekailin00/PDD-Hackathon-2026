@@ -28,6 +28,9 @@
   --pattern: rgba(43, 24, 16, .12);
   --placeholder: rgba(90, 64, 48, .62);
   --shadow-color: var(--ink);
+  --scroll-track: #d5bf93;
+  --scroll-thumb: #765033;
+  --scroll-thumb-hover: #d94f04;
 
   --shadow: 4px 4px 0 var(--shadow-color);
   --shadow-sm: 2px 2px 0 var(--shadow-color);
@@ -56,6 +59,9 @@ html[data-theme-mode="dark"],
   --pattern: rgba(13, 11, 9, .22);
   --placeholder: rgba(216, 187, 145, .68);
   --shadow-color: #070504;
+  --scroll-track: #3a2a20;
+  --scroll-thumb: #c49b6d;
+  --scroll-thumb-hover: #f06c25;
   color-scheme: dark;
 }
 
@@ -294,6 +300,77 @@ body {
   max-height: 106px;
   overflow-y: auto;
   padding: 2px 4px 4px 2px;
+}
+
+/* 所有可捲動區域共用的細版工作坊風格捲軸。 */
+:is(
+  .participant-list,
+  .room-messages,
+  .conversation-feed,
+  .artifact-body,
+  .approval-roster
+) {
+  scrollbar-color: var(--scroll-thumb) transparent;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+}
+
+:is(
+  .participant-list,
+  .room-messages,
+  .conversation-feed,
+  .artifact-body,
+  .approval-roster
+)::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+:is(
+  .participant-list,
+  .room-messages,
+  .conversation-feed,
+  .artifact-body,
+  .approval-roster
+)::-webkit-scrollbar-track {
+  margin-block: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--scroll-track) 55%, transparent);
+}
+
+:is(
+  .participant-list,
+  .room-messages,
+  .conversation-feed,
+  .artifact-body,
+  .approval-roster
+)::-webkit-scrollbar-thumb {
+  min-height: 44px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--scroll-thumb);
+  background-clip: padding-box;
+}
+
+:is(
+  .participant-list,
+  .room-messages,
+  .conversation-feed,
+  .artifact-body,
+  .approval-roster
+)::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover);
+  background-clip: padding-box;
+}
+
+:is(
+  .participant-list,
+  .room-messages,
+  .conversation-feed,
+  .artifact-body,
+  .approval-roster
+)::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 .participant-chip {
