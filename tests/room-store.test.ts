@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   addMessage,
   createRoom,
@@ -121,6 +121,44 @@ describe("production room boundaries", () => {
     expect(getRoom(created.room.id)?.participants[0].status).toBe("away");
     removeParticipant(created.room.id, creator.userId);
     expect(getRoom(created.room.id)?.participants).toHaveLength(0);
+  });
+
+  it("removes abandoned empty rooms after 15 minutes without deleting rooms with user work", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2030-01-01T00:00:00.000Z"));
+      const empty = createRoom({
+        title: "Abandoned",
+        visibility: "public",
+        participant: creator,
+      });
+      const used = createRoom({
+        title: "Keep my work",
+        visibility: "public",
+        participant: creator,
+      });
+      addMessage(used.room.id, {
+        authorName: creator.name,
+        userId: creator.userId,
+        role: creator.role,
+        kind: "member",
+        content: "Keep this room.",
+      });
+      removeParticipant(empty.room.id, creator.userId);
+      removeParticipant(used.room.id, creator.userId);
+
+      vi.advanceTimersByTime(15 * 60 * 1000 - 1);
+      expect(listPublicRooms().some((room) => room.id === empty.room.id)).toBe(true);
+
+      vi.advanceTimersByTime(1);
+      const roomIds = listPublicRooms().map((room) => room.id);
+      expect(roomIds).not.toContain(empty.room.id);
+      expect(getRoom(empty.room.id)).toBeUndefined();
+      expect(roomIds).toContain(used.room.id);
+      deleteRoom(used.room.id, creator.userId);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("lets only a creator delete a non-demo room", () => {

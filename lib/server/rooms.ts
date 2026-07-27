@@ -40,6 +40,8 @@ store.presenceConnections ??= new Map<string, number>();
 
 const now = () => new Date().toISOString();
 const inviteCode = () => randomBytes(18).toString("base64url");
+const EMPTY_INTENT = "## Goal\n\n## Acceptance criteria\n\n## Must not\n";
+const EMPTY_ROOM_TTL_MS = 15 * 60 * 1000;
 
 function cleanRoomId(value: string): string {
   const id = value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 48);
@@ -219,7 +221,46 @@ export function getRoom(roomId: string): Room | undefined {
   return room;
 }
 
+function destroyRoom(roomId: string): void {
+  publish(roomId, { type: "deleted", roomId });
+  store.rooms.delete(roomId);
+  store.secrets.delete(roomId);
+  store.sourceContexts.delete(roomId);
+  for (const key of [...store.presenceConnections.keys()]) {
+    if (key.startsWith(`${roomId}:`)) store.presenceConnections.delete(key);
+  }
+  store.listeners.delete(roomId);
+}
+
+function removeAbandonedRooms(currentTime = Date.now()): void {
+  for (const room of store.rooms.values()) {
+    const hasActiveParticipant = room.participants.some((person) => person.status !== "offline");
+    const hasUserWork = room.intent !== EMPTY_INTENT
+      || room.messages.some((message) => message.userId !== "agent")
+      || room.runs.length > 0
+      || room.steers.length > 0
+      || room.artifacts.length > 0
+      || room.votes.length > 0
+      || Boolean(room.sourceArchive)
+      || room.systemPrompt !== ROOM_AGENT_SYSTEM
+      || room.memoryEnabled
+      || Boolean(room.preferredModel)
+      || Object.keys(room.roleOverrides).length > 0;
+    const updatedAt = Date.parse(room.updatedAt);
+    if (
+      !room.isDemo
+      && !hasActiveParticipant
+      && !hasUserWork
+      && Number.isFinite(updatedAt)
+      && currentTime - updatedAt >= EMPTY_ROOM_TTL_MS
+    ) {
+      destroyRoom(room.id);
+    }
+  }
+}
+
 export function listPublicRooms(): PublicRoom[] {
+  removeAbandonedRooms();
   return [...store.rooms.values()]
     .filter((room) => room.visibility === "public")
     .map((room) => ({
@@ -265,7 +306,7 @@ export function createRoom(input: {
       truncated: input.sourceArchive.truncated,
     } : undefined,
     state: "IDLE",
-    intent: "## Goal\n\n## Acceptance criteria\n\n## Must not\n",
+    intent: EMPTY_INTENT,
     participants: [participant(input.participant)],
     messages: [{
       id: randomUUID(),
@@ -409,15 +450,7 @@ export function deleteRoom(roomId: string, userId: string): void {
   const room = requiredRoom(roomId);
   if (room.createdBy !== userId) throw new Error("Only the room creator can delete this room.");
   if (room.isDemo) throw new Error("The Demo room cannot be deleted.");
-  const id = room.id;
-  publish(id, { type: "deleted", roomId: id });
-  store.rooms.delete(id);
-  store.secrets.delete(id);
-  store.sourceContexts.delete(id);
-  for (const key of [...store.presenceConnections.keys()]) {
-    if (key.startsWith(`${id}:`)) store.presenceConnections.delete(key);
-  }
-  store.listeners.delete(id);
+  destroyRoom(room.id);
 }
 
 export function addMessage(roomId: string, message: Omit<RoomMessage, "id" | "createdAt">): RoomMessage {
